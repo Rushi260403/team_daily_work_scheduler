@@ -16,19 +16,28 @@ export const routes: Routes = [
   {
     path: 'member-dashboard',
     component: MemberDashboard,
-    canActivate: [authGuard]
+    canActivate: [authGuard],
+    data: {
+      role: 'MEMBER'
+    }
   },
 
   {
     path: 'team-admin-dashboard',
     component: TeamAdminDashboard,
-    canActivate: [authGuard]
+    canActivate: [authGuard],
+    data: {
+      role: 'TEAM_ADMIN'
+    }
   },
 
   {
     path: 'super-admin-dashboard',
     component: SuperAdminDashboard,
-    canActivate: [authGuard]
+    canActivate: [authGuard],
+    data: {
+      role: 'SUPER_ADMIN'
+    }
   }
 
 ];
