@@ -1,5 +1,136 @@
-<div>
-  <h1>Member Dashboard</h1>
+<div class="dashboard-container">
 
-  <p>Welcome to the Member Dashboard.</p>
+  <div class="dashboard-header">
+
+    <div>
+      <h1>Member Dashboard</h1>
+
+      @if (dashboardData) {
+        <p>Welcome, {{ dashboardData.user.name }}</p>
+      }
+    </div>
+
+    <button
+      class="logout-button"
+      (click)="logout()"
+    >
+      Logout
+    </button>
+
+  </div>
+
+
+  <div class="dashboard-content">
+
+    @if (errorMessage) {
+
+      <div class="error-message">
+        {{ errorMessage }}
+      </div>
+
+    }
+
+
+    @if (dashboardData) {
+
+      <div class="user-card">
+
+        <h2>My Profile</h2>
+
+        <div class="profile-row">
+
+          <div class="profile-item">
+            <span class="label">Name</span>
+            <span class="value">
+              {{ dashboardData.user.name }}
+            </span>
+          </div>
+
+          <div class="profile-item">
+            <span class="label">Email</span>
+            <span class="value">
+              {{ dashboardData.user.email }}
+            </span>
+          </div>
+
+        </div>
+
+        <div class="profile-row">
+
+          <div class="profile-item">
+            <span class="label">Role</span>
+            <span class="value">
+              {{ dashboardData.user.role }}
+            </span>
+          </div>
+
+          <div class="profile-item">
+            <span class="label">Team</span>
+            <span class="value">
+              {{ dashboardData.user.team_name }}
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="summary-section">
+
+        <h2>Work Summary</h2>
+
+        <div class="summary-grid">
+
+          <div class="summary-card">
+            <span class="summary-label">
+              Total Work Days
+            </span>
+
+            <span class="summary-value">
+              {{ dashboardData.summary.total_work_days }}
+            </span>
+          </div>
+
+
+          <div class="summary-card">
+            <span class="summary-label">
+              Completed Days
+            </span>
+
+            <span class="summary-value">
+              {{ dashboardData.summary.completed_days }}
+            </span>
+          </div>
+
+
+          <div class="summary-card">
+            <span class="summary-label">
+              Pending Days
+            </span>
+
+            <span class="summary-value">
+              {{ dashboardData.summary.pending_days }}
+            </span>
+          </div>
+
+
+          <div class="summary-card">
+            <span class="summary-label">
+              Latest Work Date
+            </span>
+
+            <span class="summary-value">
+              {{ dashboardData.summary.latest_work_date }}
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+    }
+
+  </div>
+
 </div>

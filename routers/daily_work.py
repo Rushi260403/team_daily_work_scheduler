@@ -243,13 +243,22 @@ def get_user_dashboard(
     if daily_work:
         latest_work_date = daily_work[0].work_date
 
+    # Get logged-in user's team
+    team = None
+
+    if current_user.team_id:
+        team = db.query(Team).filter(
+            Team.id == current_user.team_id
+        ).first()
+
     return {
         "user": {
             "id": current_user.id,
             "name": current_user.name,
             "email": current_user.email,
             "role": current_user.role,
-            "team_id": current_user.team_id
+            "team_id": current_user.team_id,
+            "team_name": team.team_name if team else None
         },
         "summary": {
             "total_work_days": total_work_days,
