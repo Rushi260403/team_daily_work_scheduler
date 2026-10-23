@@ -1,22 +1,33 @@
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import DailyWork, User, TeamAdmin, Team
+from models import DailyWork, User, TeamAdmin, Team, HistoricalEditRequest, HistoricalWorkEditAudit
 from schemas import (
     MorningWorkCreate,
-    EveningWorkUpdate
+    EveningWorkUpdate,
+    HistoricalEditRequestCreate,
+    HistoricalEditRequestReview,
+    HistoricalWorkEdit
 )
 from dependencies.auth import get_current_user
 
+import json
+
+def get_today_date() -> date:
+    """Return today's date using India Standard Time."""
+    from datetime import timedelta, timezone
+
+    india_timezone = timezone(timedelta(hours=5, minutes=30))
+    return datetime.now(india_timezone).date()
 
 router = APIRouter(
     prefix="/daily-work",
     tags=["Daily Work"]
 )
-
 
 # ============================================================
 # 1. SUBMIT MORNING WORK
@@ -28,6 +39,14 @@ def create_morning_work(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Allow submissions only for today's date
+    today = get_today_date()
+
+    if work_data.work_date != today:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Morning Work can only be submitted for today ({today})."
+        )
 
     # Check whether work already exists for this date
     existing_work = db.query(DailyWork).filter(
@@ -38,7 +57,7 @@ def create_morning_work(
     if existing_work:
         raise HTTPException(
             status_code=400,
-            detail="Daily work already exists for this date"
+            detail="Daily work already exists for this date."
         )
 
     # Create morning message
@@ -73,7 +92,6 @@ def create_morning_work(
         "morning_message": new_work.morning_message
     }
 
-
 # ============================================================
 # 2. SUBMIT EVENING WORK
 # ============================================================
@@ -85,38 +103,59 @@ def update_evening_work(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Allow submissions only for today's date
+    today = get_today_date()
 
+    if work_date != today:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Evening Work can only be submitted for today ({today})."
+        )
+
+    # Find the user's daily work record
     existing_work = db.query(DailyWork).filter(
         DailyWork.user_id == current_user.id,
         DailyWork.work_date == work_date
     ).first()
 
+    # Morning Work must exist first
     if not existing_work:
         raise HTTPException(
             status_code=404,
-            detail="Morning work not found for this date"
+            detail="Morning Work has not been submitted for this date."
         )
 
+    # Reject duplicate Evening Work submissions
+    if existing_work.office_out_time is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Evening Work has already been submitted for this date."
+        )
+
+    # Save Evening Work
     existing_work.office_out_time = work_data.office_out_time
     existing_work.points_completed = work_data.points_completed
-    existing_work.pending_points = work_data.pending_points
+    existing_work.pending_points = (
+        work_data.pending_points.strip()
+        if work_data.pending_points
+        else ""
+    )
 
-    # Create evening message
-    evening_message = (
+    # Create the Evening Work message
+    existing_work.evening_message = (
         f"Date: {existing_work.work_date}. "
         f"Office Out Time: {work_data.office_out_time}. "
         f"Points Completed: {work_data.points_completed}. "
-        f"Pending Points: {work_data.pending_points}"
+        f"Pending Points: {existing_work.pending_points}"
     )
 
-    existing_work.evening_message = evening_message
     existing_work.updated_at = datetime.now()
 
     db.commit()
     db.refresh(existing_work)
 
     return {
-        "message": "Evening work saved successfully",
+        "message": "Evening Work saved successfully.",
         "daily_work_id": existing_work.id,
         "user_id": existing_work.user_id,
         "work_date": existing_work.work_date,
@@ -211,39 +250,72 @@ def get_my_daily_work_by_date(
 # 5. MEMBER - USER DASHBOARD
 # ============================================================
 
+
 @router.get("/dashboard")
 def get_user_dashboard(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # TEAM_ADMIN: Get work records from assigned teams
+    if current_user.role == "TEAM_ADMIN":
 
-    # Get all work of logged-in user
-    daily_work = db.query(DailyWork).filter(
-        DailyWork.user_id == current_user.id
-    ).order_by(
-        DailyWork.work_date.desc()
-    ).all()
+        assignments = db.query(TeamAdmin).filter(
+            TeamAdmin.user_id == current_user.id
+        ).all()
 
+        team_ids = [
+            assignment.team_id
+            for assignment in assignments
+        ]
+
+        if team_ids:
+            team_members = db.query(User).filter(
+                User.team_id.in_(team_ids),
+                User.role == "MEMBER",
+                User.is_activate == True
+            ).all()
+
+            member_ids = [
+                member.id
+                for member in team_members
+            ]
+
+            if member_ids:
+                daily_work = db.query(DailyWork).filter(
+                    DailyWork.user_id.in_(member_ids)
+                ).order_by(
+                    DailyWork.work_date.desc()
+                ).all()
+            else:
+                daily_work = []
+        else:
+            daily_work = []
+
+    # Other roles: retain the logged-in user's own work
+    else:
+        daily_work = db.query(DailyWork).filter(
+            DailyWork.user_id == current_user.id
+        ).order_by(
+            DailyWork.work_date.desc()
+        ).all()
+
+    # Calculate summary
     total_work_days = len(daily_work)
 
-    completed_days = 0
-    pending_days = 0
+    completed_days = sum(
+        1 for work in daily_work
+        if work.office_out_time is not None
+    )
 
-    for work in daily_work:
+    pending_days = total_work_days - completed_days
 
-        # If evening work is submitted,
-        # consider the day completed
-        if work.office_out_time is not None:
-            completed_days += 1
-        else:
-            pending_days += 1
+    latest_work_date = (
+        daily_work[0].work_date
+        if daily_work
+        else None
+    )
 
-    latest_work_date = None
-
-    if daily_work:
-        latest_work_date = daily_work[0].work_date
-
-    # Get logged-in user's team
+    # Get the logged-in user's team information
     team = None
 
     if current_user.team_id:
@@ -267,6 +339,7 @@ def get_user_dashboard(
             "latest_work_date": latest_work_date
         }
     }
+
 
 
 # ============================================================
@@ -1015,4 +1088,455 @@ def get_admin_user_wise_work(
         },
         "total_records": len(result),
         "work": result
+    }
+
+# ============================================================
+# 3. REQUEST HISTORICAL WORK EDIT
+# ============================================================
+
+@router.post("/historical-edit-request")
+def create_historical_edit_request(
+    request_data: HistoricalEditRequestCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Only MEMBER and TEAM_ADMIN can request historical edits
+    if current_user.role != "MEMBER":
+        raise HTTPException(
+        status_code=403,
+        detail="Only members can submit historical edit requests. "
+               "TEAM_ADMIN must request edits for their own work through "
+               "the appropriate self-service workflow."
+    )
+
+    # Find the requested work record
+    daily_work = db.query(DailyWork).filter(
+        DailyWork.id == request_data.daily_work_id
+    ).first()
+
+    if not daily_work:
+        raise HTTPException(
+            status_code=404,
+            detail="Daily work record not found."
+        )
+
+    # Members can request edits only for their own work
+    if current_user.role == "MEMBER":
+        if daily_work.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can request edits only for your own work."
+            )
+
+    # TEAM_ADMIN can request edits only for work belonging
+    # to their assigned teams
+    elif current_user.role == "TEAM_ADMIN":
+        work_owner = db.query(User).filter(
+            User.id == daily_work.user_id
+        ).first()
+
+        if not work_owner or not work_owner.team_id:
+            raise HTTPException(
+                status_code=403,
+                detail="The work owner does not belong to a team."
+            )
+
+        assignment = db.query(TeamAdmin).filter(
+            TeamAdmin.user_id == current_user.id,
+            TeamAdmin.team_id == work_owner.team_id
+        ).first()
+
+        if not assignment:
+            raise HTTPException(
+                status_code=403,
+                detail="You can request edits only for work in your assigned teams."
+            )
+
+    # Work must be historical, not today's work
+    today = get_today_date()
+
+    if daily_work.work_date >= today:
+        raise HTTPException(
+            status_code=400,
+            detail="Historical edit requests are allowed only for previous dates."
+        )
+
+    # Prevent duplicate pending requests for the same work record
+    existing_request = db.query(HistoricalEditRequest).filter(
+        HistoricalEditRequest.daily_work_id == daily_work.id,
+        HistoricalEditRequest.requested_by == current_user.id,
+        HistoricalEditRequest.status == "PENDING"
+    ).first()
+
+    if existing_request:
+        raise HTTPException(
+            status_code=409,
+            detail="A pending historical edit request already exists."
+        )
+
+    # Create the request
+    new_request = HistoricalEditRequest(
+        daily_work_id=daily_work.id,
+        requested_by=current_user.id,
+        request_reason=request_data.request_reason.strip(),
+        status="PENDING",
+        requested_at=datetime.now()
+    )
+
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+
+    return {
+        "message": "Historical edit request submitted successfully.",
+        "request_id": new_request.id,
+        "daily_work_id": new_request.daily_work_id,
+        "requested_by": new_request.requested_by,
+        "status": new_request.status,
+        "requested_at": new_request.requested_at
+    }
+
+
+
+@router.put("/historical-edit-request/{request_id}/review")
+def review_historical_edit_request(
+    request_id: int,
+    review_data: HistoricalEditRequestReview,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Only TEAM_ADMIN and SUPER_ADMIN can review requests
+    if current_user.role not in ["TEAM_ADMIN", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to review historical edit requests."
+        )
+
+    # Find the historical edit request
+    edit_request = db.query(HistoricalEditRequest).filter(
+        HistoricalEditRequest.id == request_id
+    ).first()
+
+    if not edit_request:
+        raise HTTPException(
+            status_code=404,
+            detail="Historical edit request not found."
+        )
+
+    # A request can be reviewed only once
+    if edit_request.status != "PENDING":
+        raise HTTPException(
+            status_code=409,
+            detail="This request has already been reviewed."
+        )
+
+    # Find the associated daily work record
+    daily_work = db.query(DailyWork).filter(
+        DailyWork.id == edit_request.daily_work_id
+    ).first()
+
+    if not daily_work:
+        raise HTTPException(
+            status_code=404,
+            detail="Associated daily work record not found."
+        )
+
+    # Find the person who submitted the request
+    requester = db.query(User).filter(
+        User.id == edit_request.requested_by
+    ).first()
+
+    if not requester:
+        raise HTTPException(
+            status_code=404,
+            detail="Requesting user not found."
+        )
+
+    # MEMBER requests can be reviewed by SUPER_ADMIN
+    # or by their assigned TEAM_ADMIN
+    if requester.role == "MEMBER":
+
+        if current_user.role == "SUPER_ADMIN":
+            # SUPER_ADMIN can review requests from any team
+            pass
+
+        elif current_user.role == "TEAM_ADMIN":
+
+            if not requester.team_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="The requesting member is not assigned to a team."
+                )
+
+            assignment = db.query(TeamAdmin).filter(
+                TeamAdmin.user_id == current_user.id,
+                TeamAdmin.team_id == requester.team_id
+            ).first()
+
+            if not assignment:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not the assigned TEAM_ADMIN for this member's team."
+                )
+
+    # TEAM_ADMIN requests must be reviewed by SUPER_ADMIN
+    elif requester.role == "TEAM_ADMIN":
+
+        if current_user.role != "SUPER_ADMIN":
+            raise HTTPException(
+                status_code=403,
+                detail="TEAM_ADMIN requests must be reviewed by SUPER_ADMIN."
+            )
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="This request was not submitted by a MEMBER or TEAM_ADMIN."
+        )
+
+    # Update review details
+    edit_request.status = review_data.status
+    edit_request.reviewed_by = current_user.id
+    edit_request.review_comment = (
+        review_data.review_comment.strip()
+        if review_data.review_comment
+        else None
+    )
+    edit_request.reviewed_at = datetime.now()
+
+    db.commit()
+    db.refresh(edit_request)
+
+    return {
+        "message": (
+            f"Historical edit request "
+            f"{edit_request.status.lower()} successfully."
+        ),
+        "request_id": edit_request.id,
+        "daily_work_id": edit_request.daily_work_id,
+        "status": edit_request.status,
+        "reviewed_by": edit_request.reviewed_by,
+        "review_comment": edit_request.review_comment,
+        "reviewed_at": edit_request.reviewed_at
+    }
+
+@router.put("/historical-work/{daily_work_id}/edit")
+def edit_historical_work(
+    daily_work_id: int,
+    edit_data: HistoricalWorkEdit,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Find the historical work record
+    daily_work = db.query(DailyWork).filter(
+        DailyWork.id == daily_work_id
+    ).first()
+
+    if not daily_work:
+        raise HTTPException(
+            status_code=404,
+            detail="Daily work record not found."
+        )
+
+    # Only allow edits to previous dates
+    today = get_today_date()
+
+    if daily_work.work_date >= today:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is only for historical work."
+        )
+
+    # Find an approved request for this work record
+    approved_request = db.query(HistoricalEditRequest).filter(
+        HistoricalEditRequest.daily_work_id == daily_work_id,
+        HistoricalEditRequest.status == "APPROVED"
+    ).order_by(
+        HistoricalEditRequest.reviewed_at.desc()
+    ).first()
+
+    if not approved_request:
+        raise HTTPException(
+            status_code=403,
+            detail="An approved historical edit request is required."
+        )
+
+    if approved_request.used_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="This approved request has already been used."
+    )
+
+    
+    # Verify the editor is the member who requested the approval
+    if current_user.role != "MEMBER":
+        raise HTTPException(
+            status_code=403,
+            detail="Only members can edit their own historical work."
+        )
+
+    if current_user.id != daily_work.user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can edit only your own historical work."
+        )
+
+    if approved_request.requested_by != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can edit only work covered by your own approved request."
+        )
+
+
+    
+    # Update only fields supplied by the caller
+    update_data = edit_data.model_dump(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide at least one field to update."
+        )
+
+    # Capture original values before changing anything
+    old_values = {}
+
+    for field in update_data:
+        old_value = getattr(daily_work, field)
+
+        if isinstance(old_value, (datetime, date)):
+            old_values[field] = old_value.isoformat()
+        elif hasattr(old_value, "isoformat"):
+            old_values[field] = old_value.isoformat()
+        else:
+            old_values[field] = old_value
+
+    # Apply the requested changes
+    for field, value in update_data.items():
+        setattr(daily_work, field, value)
+
+    daily_work.updated_at = datetime.now()
+
+    # Capture the updated values
+    new_values = {}
+
+    for field in update_data:
+        new_value = getattr(daily_work, field)
+
+        if isinstance(new_value, (datetime, date)):
+            new_values[field] = new_value.isoformat()
+        elif hasattr(new_value, "isoformat"):
+            new_values[field] = new_value.isoformat()
+        else:
+            new_values[field] = new_value
+
+    # Create the audit record
+    audit_record = HistoricalWorkEditAudit(
+        daily_work_id=daily_work.id,
+        edit_request_id=approved_request.id,
+        edited_by=current_user.id,
+        old_values=json.dumps(old_values),
+        new_values=json.dumps(new_values),
+        edited_at=datetime.now()
+    )
+
+    db.add(audit_record)
+
+    approved_request.used_at = datetime.now()
+
+    # Save the work update and audit record together
+    try:
+        db.commit()
+        db.refresh(daily_work)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save the historical edit and audit record."
+        )
+
+    return {
+        "message": "Historical work updated successfully.",
+        "daily_work_id": daily_work.id,
+        "work_date": daily_work.work_date,
+        "updated_by": current_user.id,
+        "updated_at": daily_work.updated_at
+    }
+
+# ============================================================
+# 11. HISTORICAL WORK EDIT AUDIT LOGS
+# GET /daily-work/historical-work-audit
+# SUPER_ADMIN: all audit logs
+# TEAM_ADMIN: logs for members in assigned teams
+# MEMBER: not allowed
+# ============================================================
+
+@router.get("/historical-work-audit")
+def get_historical_work_edit_audit(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Only administrators can view historical edit audit logs.
+    if current_user.role not in ["TEAM_ADMIN", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only TEAM_ADMIN or SUPER_ADMIN can view historical edit audit logs."
+        )
+
+    query = (
+        db.query(HistoricalWorkEditAudit, DailyWork, User)
+        .join(DailyWork, HistoricalWorkEditAudit.daily_work_id == DailyWork.id)
+        .join(User, DailyWork.user_id == User.id)
+    )
+
+    if current_user.role == "TEAM_ADMIN":
+        assignments = db.query(TeamAdmin).filter(
+            TeamAdmin.user_id == current_user.id
+        ).all()
+
+        team_ids = [assignment.team_id for assignment in assignments]
+
+        if not team_ids:
+            return {"total_records": 0, "audit_logs": []}
+
+        query = query.filter(User.team_id.in_(team_ids), User.role == "MEMBER")
+
+    records = query.order_by(
+        HistoricalWorkEditAudit.edited_at.desc()
+    ).all()
+
+    audit_logs = []
+    for audit, work, editor_work_owner in records:
+        editor = db.query(User).filter(
+            User.id == audit.edited_by
+        ).first()
+        edit_request = db.query(HistoricalEditRequest).filter(
+            HistoricalEditRequest.id == audit.edit_request_id
+        ).first()
+        reviewer = None
+        if edit_request and edit_request.reviewed_by is not None:
+            reviewer = db.query(User).filter(
+                User.id == edit_request.reviewed_by
+            ).first()
+
+        audit_logs.append({
+            "audit_id": audit.id,
+            "daily_work_id": audit.daily_work_id,
+            "work_date": work.work_date,
+            "work_owner_id": editor_work_owner.id,
+            "work_owner_name": editor_work_owner.name,
+            "edit_request_id": audit.edit_request_id,
+            "requested_by": edit_request.requested_by if edit_request else None,
+            "reviewed_by": edit_request.reviewed_by if edit_request else None,
+            "reviewer_name": reviewer.name if reviewer else None,
+            "edited_by": audit.edited_by,
+            "editor_name": editor.name if editor else None,
+            "old_values": json.loads(audit.old_values),
+            "new_values": json.loads(audit.new_values),
+            "edited_at": audit.edited_at
+        })
+
+    return {
+        "total_records": len(audit_logs),
+        "audit_logs": audit_logs
     }

@@ -7,10 +7,9 @@ import { SuperAdminDashboard } from './super-admin-dashboard/super-admin-dashboa
 import { authGuard } from './guards/auth-guard';
 
 export const routes: Routes = [
-
   {
     path: '',
-    component: Login
+    component: Login,
   },
 
   {
@@ -18,8 +17,8 @@ export const routes: Routes = [
     component: MemberDashboard,
     canActivate: [authGuard],
     data: {
-      role: 'MEMBER'
-    }
+      role: 'MEMBER',
+    },
   },
 
   {
@@ -27,8 +26,8 @@ export const routes: Routes = [
     component: TeamAdminDashboard,
     canActivate: [authGuard],
     data: {
-      role: 'TEAM_ADMIN'
-    }
+      role: 'TEAM_ADMIN',
+    },
   },
 
   {
@@ -36,8 +35,12 @@ export const routes: Routes = [
     component: SuperAdminDashboard,
     canActivate: [authGuard],
     data: {
-      role: 'SUPER_ADMIN'
-    }
-  }
+      role: 'SUPER_ADMIN',
+    },
+  },
 
+  {
+    path: '**',
+    redirectTo: '',
+  },
 ];

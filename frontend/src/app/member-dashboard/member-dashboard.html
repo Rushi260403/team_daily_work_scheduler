@@ -1,7 +1,5 @@
 <div class="dashboard-container">
-
   <div class="dashboard-header">
-
     <div>
       <h1>Member Dashboard</h1>
 
@@ -10,35 +8,15 @@
       }
     </div>
 
-    <button
-      class="logout-button"
-      (click)="logout()"
-    >
-      Logout
-    </button>
-
+    <button class="logout-button" (click)="logout()">Logout</button>
   </div>
 
-
   <div class="dashboard-content">
-
-    @if (errorMessage) {
-
-      <div class="error-message">
-        {{ errorMessage }}
-      </div>
-
-    }
-
-
     @if (dashboardData) {
-
       <div class="user-card">
-
         <h2>My Profile</h2>
 
         <div class="profile-row">
-
           <div class="profile-item">
             <span class="label">Name</span>
             <span class="value">
@@ -52,11 +30,9 @@
               {{ dashboardData.user.email }}
             </span>
           </div>
-
         </div>
 
         <div class="profile-row">
-
           <div class="profile-item">
             <span class="label">Role</span>
             <span class="value">
@@ -70,67 +46,327 @@
               {{ dashboardData.user.team_name }}
             </span>
           </div>
-
         </div>
-
       </div>
 
-
       <div class="summary-section">
-
         <h2>Work Summary</h2>
 
         <div class="summary-grid">
-
           <div class="summary-card">
-            <span class="summary-label">
-              Total Work Days
-            </span>
-
+            <span class="summary-label">Total Work Days</span>
             <span class="summary-value">
               {{ dashboardData.summary.total_work_days }}
             </span>
           </div>
 
-
           <div class="summary-card">
-            <span class="summary-label">
-              Completed Days
-            </span>
-
+            <span class="summary-label">Completed Days</span>
             <span class="summary-value">
               {{ dashboardData.summary.completed_days }}
             </span>
           </div>
 
-
           <div class="summary-card">
-            <span class="summary-label">
-              Pending Days
-            </span>
-
+            <span class="summary-label">Pending Days</span>
             <span class="summary-value">
               {{ dashboardData.summary.pending_days }}
             </span>
           </div>
 
-
           <div class="summary-card">
-            <span class="summary-label">
-              Latest Work Date
-            </span>
-
+            <span class="summary-label">Latest Work Date</span>
             <span class="summary-value">
               {{ dashboardData.summary.latest_work_date }}
             </span>
           </div>
-
         </div>
-
       </div>
 
+      <!-- Morning Work -->
+
+      <div class="work-section">
+        <h2>Morning Work</h2>
+
+        <div class="form-group">
+          <label>Work Date</label>
+          <p class="today-date">{{ workDate }}</p>
+        </div>
+
+        <div class="form-group">
+          <label for="officeInTime">Office In Time</label>
+          <input type="time" id="officeInTime" [(ngModel)]="officeInTime" />
+        </div>
+
+        <div class="form-group">
+          <label for="workingPoints">Working Points</label>
+          <textarea
+            id="workingPoints"
+            [(ngModel)]="workingPoints"
+            rows="5"
+            placeholder="Enter today's working points"
+          ></textarea>
+        </div>
+
+        <button class="submit-button" [disabled]="morningSubmitting" (click)="submitMorningWork()">
+          {{ morningSubmitting ? 'Submitting...' : 'Submit Morning Work' }}
+        </button>
+      </div>
+
+      <!-- Morning Work Messages: Below Morning Work, Above Evening Work -->
+
+      @if (morningMessage) {
+        <p class="success-message">
+          {{ morningMessage }}
+        </p>
+      }
+
+      @if (errorMessage) {
+        <p class="error-message">
+          {{ errorMessage }}
+        </p>
+      }
+
+      <!-- Evening Work -->
+
+      <div class="work-section">
+        <h2>Evening Work</h2>
+
+        <div class="form-group">
+          <label>Work Date</label>
+          <p class="today-date">{{ workDate }}</p>
+        </div>
+
+        <div class="form-group">
+          <label for="officeOutTime">Office Out Time</label>
+          <input type="time" id="officeOutTime" [(ngModel)]="officeOutTime" />
+        </div>
+
+        <div class="form-group">
+          <label for="pointsCompleted">Points Completed</label>
+          <textarea
+            id="pointsCompleted"
+            [(ngModel)]="pointsCompleted"
+            rows="4"
+            placeholder="Enter completed work"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="pendingPoints">Pending Points</label>
+          <textarea
+            id="pendingPoints"
+            [(ngModel)]="pendingPoints"
+            rows="4"
+            placeholder="Enter pending work"
+          ></textarea>
+        </div>
+
+        <button class="submit-button" [disabled]="eveningSubmitting" (click)="submitEveningWork()">
+          {{ eveningSubmitting ? 'Submitting...' : 'Submit Evening Work' }}
+        </button>
+
+        <!-- Evening Work Messages: Below Evening Work -->
+
+        @if (eveningMessage) {
+          <p class="success-message">
+            {{ eveningMessage }}
+          </p>
+        }
+
+        @if (eveningErrorMessage) {
+          <p class="error-message">
+            {{ eveningErrorMessage }}
+          </p>
+        }
+      </div>
+
+      <!-- Work History -->
+      <div class="work-section history-section">
+        <div class="history-header">
+          <div>
+            <h2>Work History</h2>
+            <p>Search, filter, and review your daily work records.</p>
+          </div>
+
+          <span class="history-count">
+            {{ filteredWorkHistory.length }}
+            {{ filteredWorkHistory.length === 1 ? 'Record' : 'Records' }}
+          </span>
+        </div>
+
+        <!-- Search and Date Filters -->
+        <div class="history-filters">
+          <div class="history-search">
+            <label for="historySearch">Search records</label>
+            <input
+              id="historySearch"
+              type="search"
+              name="historySearch"
+              [(ngModel)]="historySearch"
+              placeholder="Search tasks, dates, completed or pending work..."
+            />
+          </div>
+
+          <div class="history-date-filter">
+            <label for="historyStartDate">From date</label>
+            <input
+              id="historyStartDate"
+              type="date"
+              name="historyStartDate"
+              [(ngModel)]="historyStartDate"
+              [max]="historyEndDate || undefined"
+            />
+          </div>
+
+          <div class="history-date-filter">
+            <label for="historyEndDate">To date</label>
+            <input
+              id="historyEndDate"
+              type="date"
+              name="historyEndDate"
+              [(ngModel)]="historyEndDate"
+              [min]="historyStartDate || undefined"
+            />
+          </div>
+
+          <button
+            type="button"
+            class="history-clear-button"
+            (click)="clearHistoryFilters()"
+            [disabled]="!historySearch && !historyStartDate && !historyEndDate"
+          >
+            Clear filters
+          </button>
+        </div>
+
+        @if (historyLoading) {
+          <div class="history-state">Loading work history...</div>
+        }
+
+        @if (historyError) {
+          <div class="history-alert">{{ historyError }}</div>
+        }
+
+        @if (!historyLoading && !historyError && filteredWorkHistory.length === 0) {
+          <div class="history-state">
+            <strong>No matching records found</strong>
+            <span>Try another search term or date range.</span>
+          </div>
+        }
+
+        @if (!historyLoading && filteredWorkHistory.length > 0) {
+          <p class="history-scroll-hint"><span>↔</span> Scroll horizontally to view all columns</p>
+
+          <div class="history-table-container history-scroll-container">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Office In</th>
+                  <th>Working Points</th>
+                  <th>Office Out</th>
+                  <th>Points Completed</th>
+                  <th>Pending Points</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                @for (record of filteredWorkHistory; track record.id) {
+                  <tr>
+                    <td>
+                      <span class="history-date">{{ record.work_date }}</span>
+                    </td>
+                    <td>
+                      <span class="history-time">{{ record.office_in_time || '—' }}</span>
+                    </td>
+                    <td>
+                      <div class="history-text">{{ record.working_points || '—' }}</div>
+                    </td>
+                    <td>
+                      <span class="history-time">{{ record.office_out_time || '—' }}</span>
+                    </td>
+                    <td>
+                      <div class="history-text">{{ record.points_completed || '—' }}</div>
+                    </td>
+                    <td>
+                      <div class="history-text pending-text">
+                        {{ record.pending_points || '—' }}
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <div class="history-footer">
+          Showing {{ filteredWorkHistory.length }} of {{ workHistory.length }} records
+        </div>
+      </div>
+
+      <!-- Historical Edit Request -->
+
+      <div class="work-section">
+        <h2>Request Historical Work Edit</h2>
+
+        <p>
+          Select a previous work date and explain why the record needs correction. Administrator
+          approval is required before editing.
+        </p>
+
+        <div class="form-group">
+          <label for="historicalWorkDate">Select Work Date</label>
+          <select
+            id="historicalWorkDate"
+            name="historicalWorkDate"
+            [(ngModel)]="selectedHistoricalWorkDate"
+            required
+          >
+            <option value="">-- Select a work date --</option>
+
+            @for (record of workHistory; track record.id) {
+              <option [value]="record.work_date">
+                {{ record.work_date }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="historicalEditReason">Reason for Edit</label>
+          <textarea
+            id="historicalEditReason"
+            name="historicalEditReason"
+            [(ngModel)]="historicalEditReason"
+            rows="4"
+            maxlength="1000"
+            placeholder="Explain why this historical record needs correction"
+            required
+          ></textarea>
+        </div>
+
+        <button
+          class="submit-button"
+          [disabled]="
+            historicalRequestSubmitting ||
+            !selectedHistoricalWorkDate ||
+            !historicalEditReason.trim()
+          "
+          (click)="submitHistoricalEditRequest()"
+        >
+          {{ historicalRequestSubmitting ? 'Submitting...' : 'Submit Edit Request' }}
+        </button>
+
+        @if (historicalRequestMessage) {
+          <p class="success-message">{{ historicalRequestMessage }}</p>
+        }
+
+        @if (historicalRequestError) {
+          <p class="error-message">{{ historicalRequestError }}</p>
+        }
+      </div>
     }
-
   </div>
-
 </div>

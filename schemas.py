@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import date, time
+from typing import Optional
 
 class UserCreate(BaseModel):
     name:str
@@ -59,3 +60,34 @@ class DailyWorkResponse(BaseModel):
     pending_points: str | None = None
     morning_message: str | None = None
     evening_message: str | None = None
+
+# ============================================================
+# HISTORICAL EDIT REQUEST SCHEMAS
+# ============================================================
+class HistoricalEditRequestCreate(BaseModel):
+    daily_work_id: int
+    request_reason: str = Field(
+        ...,
+        min_length=5,
+        max_length=1000
+    )
+
+
+class HistoricalEditRequestReview(BaseModel):
+    status: str
+    review_comment: Optional[str] = Field(
+        default=None,
+        max_length=1000
+    )
+
+
+class HistoricalEditRequestReview(BaseModel):
+    status: str = Field(..., pattern="^(APPROVED|REJECTED)$")
+    review_comment: str | None = Field(default=None, max_length=1000)
+
+class HistoricalWorkEdit(BaseModel):
+    office_in_time: time | None = None
+    working_points: str | None = None
+    office_out_time: time | None = None
+    points_completed: str | None = None
+    pending_points: str | None = None

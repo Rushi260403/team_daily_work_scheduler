@@ -1,4 +1,5 @@
 from sqlalchemy import (Column, Integer, String, Boolean, Date, Time, DateTime, Text, ForeignKey)
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -238,4 +239,76 @@ class UserSettings(Base):
     updated_at = Column(
         DateTime,
         nullable=True
+    )
+
+class HistoricalEditRequest(Base):
+    __tablename__ = "historical_edit_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    daily_work_id = Column(
+        Integer,
+        ForeignKey("daily_work.id"),
+        nullable=False
+    )
+
+    requested_by = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    request_reason = Column(String(1000), nullable=False)
+
+    status = Column(
+        String(20),
+        nullable=False,
+        default="PENDING"
+    )
+
+    reviewed_by = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    review_comment = Column(String(1000), nullable=True)
+
+    requested_at = Column(DateTime, nullable=False)
+
+    reviewed_at = Column(DateTime, nullable=True)
+
+    used_at = Column(DateTime, nullable=True)
+
+
+class HistoricalWorkEditAudit(Base):
+    __tablename__ = "historical_work_edit_audit"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    daily_work_id = Column(
+        Integer,
+        ForeignKey("daily_work.id"),
+        nullable=False
+    )
+
+    edit_request_id = Column(
+        Integer,
+        ForeignKey("historical_edit_requests.id"),
+        nullable=False
+    )
+
+    edited_by = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    old_values = Column(Text, nullable=False)
+
+    new_values = Column(Text, nullable=False)
+
+    edited_at = Column(
+        DateTime,
+        nullable=False
     )

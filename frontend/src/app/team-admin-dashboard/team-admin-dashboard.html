@@ -1,5 +1,183 @@
-<div>
-  <h1>Team Admin Dashboard</h1>
 
-  <p>Welcome to the Team Admin Dashboard.</p>
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <div>
+      <h1>Team Admin Dashboard</h1>
+      <p>Manage your team and monitor daily work.</p>
+    </div>
+
+    <button type="button" class="logout-btn" (click)="logout()">
+      Logout
+    </button>
+  </header>
+
+  @if (user) {
+    <section class="welcome-section">
+      <div>
+        <h2>Welcome, {{ user.name }}</h2>
+        <p>{{ user.email }}</p>
+      </div>
+
+      <div class="team-badge">
+        {{ user.team_name || 'Assigned Team' }}
+      </div>
+    </section>
+  }
+
+  @if (dashboardLoading) {
+    <p class="status-message">Loading dashboard...</p>
+  }
+
+  @if (dashboardError) {
+    <p class="error-message">{{ dashboardError }}</p>
+    <button type="button" class="secondary-btn" (click)="loadDashboard()">
+      Retry
+    </button>
+  }
+
+  <section class="summary-grid">
+    <article class="summary-card">
+      <h3>Total Work Days</h3>
+      <p class="summary-value">{{ summary.total_work_days }}</p>
+    </article>
+
+    <article class="summary-card">
+      <h3>Completed Days</h3>
+      <p class="summary-value">{{ summary.completed_days }}</p>
+    </article>
+
+    <article class="summary-card">
+      <h3>Pending Days</h3>
+      <p class="summary-value">{{ summary.pending_days }}</p>
+    </article>
+
+    <article class="summary-card">
+      <h3>Latest Work Date</h3>
+      <p class="summary-date">
+        {{ summary.latest_work_date || 'No records yet' }}
+      </p>
+    </article>
+  </section>
+
+  <section class="history-section">
+    <div class="history-heading">
+      <div>
+        <h2>Team Work History</h2>
+        <p>View daily work records for your assigned team.</p>
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="refreshWorkHistory()"
+        [disabled]="historyLoading"
+      >
+        {{ historyLoading ? 'Loading...' : 'Refresh History' }}
+      </button>
+    </div>
+
+    <div class="history-filters">
+      <div class="filter-field search-field">
+        <label for="historySearch">Search records</label>
+        <input
+          id="historySearch"
+          type="search"
+          [(ngModel)]="historySearch"
+          placeholder="Name, email, date or work details"
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="historyStartDate">From date</label>
+        <input
+          id="historyStartDate"
+          type="date"
+          [(ngModel)]="historyStartDate"
+          [max]="historyEndDate || undefined"
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="historyEndDate">To date</label>
+        <input
+          id="historyEndDate"
+          type="date"
+          [(ngModel)]="historyEndDate"
+          [min]="historyStartDate || undefined"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="clear-btn"
+        (click)="clearHistoryFilters()"
+      >
+        Clear Filters
+      </button>
+    </div>
+
+    <div class="history-count">
+      Showing {{ filteredWorkHistory.length }} of {{ workHistory.length }} records
+    </div>
+
+    @if (historyLoading) {
+      <p class="status-message">Loading team work history...</p>
+    }
+
+    @if (historyError) {
+      <p class="error-message">{{ historyError }}</p>
+      <button type="button" class="secondary-btn" (click)="loadWorkHistory()">
+        Retry
+      </button>
+    }
+
+    @if (!historyLoading && !historyError) {
+      @if (filteredWorkHistory.length > 0) {
+        <div class="history-table-container">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Member Name</th>
+                <th>Email</th>
+                <th>Office In</th>
+                <th>Working Points</th>
+                <th>Office Out</th>
+                <th>Points Completed</th>
+                <th>Pending Points</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (record of filteredWorkHistory; track record.daily_work_id) {
+                <tr>
+                  <td>{{ record.work_date || '—' }}</td>
+                  <td>{{ record.user_name || '—' }}</td>
+                  <td>{{ record.user_email || '—' }}</td>
+                  <td>{{ record.office_in_time || '—' }}</td>
+                  <td class="work-details">
+                    {{ record.working_points || '—' }}
+                  </td>
+                  <td>{{ record.office_out_time || '—' }}</td>
+                  <td class="work-details">
+                    {{ record.points_completed || '—' }}
+                  </td>
+                  <td class="work-details">
+                    {{ record.pending_points || '—' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <h3>No work records found</h3>
+          <p>
+            There are no matching records. Try changing the search or date filters.
+          </p>
+        </div>
+      }
+    }
+  </section>
 </div>
