@@ -1,5 +1,986 @@
-<div>
-  <h1>Super Admin Dashboard</h1>
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <div>
+      <h1>Super Admin Dashboard</h1>
+      <p>Manage work records and monitor all teams.</p>
+    </div>
 
-  <p>Welcome to the Super Admin Dashboard.</p>
+    <button type="button" class="logout-btn" (click)="logout()">Logout</button>
+  </header>
+
+  @if (user) {
+    <section class="welcome-section">
+      <h2>Welcome, {{ user.name }}!</h2>
+      <p>{{ user.email }}</p>
+      <span class="role-badge">{{ user.role }}</span>
+    </section>
+  }
+
+  @if (dashboardLoading) {
+    <p class="status-message">Loading dashboard...</p>
+  }
+
+  @if (dashboardError) {
+    <p class="error-message">{{ dashboardError }}</p>
+  }
+
+  @if (!dashboardLoading && !dashboardError) {
+    <section class="summary-grid">
+      <article class="summary-card total-card">
+        <h3>Total Work Days</h3>
+        <p>{{ summary.total_work_days }}</p>
+      </article>
+
+      <article class="summary-card completed-card">
+        <h3>Completed Days</h3>
+        <p>{{ summary.completed_days }}</p>
+      </article>
+
+      <article class="summary-card pending-card">
+        <h3>Pending Days</h3>
+        <p>{{ summary.pending_days }}</p>
+      </article>
+
+      <article class="summary-card latest-card">
+        <h3>Latest Work Date</h3>
+        <p>{{ summary.latest_work_date || '—' }}</p>
+      </article>
+    </section>
+  }
+
+  <section class="team-management-section">
+    <div class="section-header">
+      <div>
+        <h2>Team Management</h2>
+        <p>Create and manage teams for your organization.</p>
+      </div>
+
+      <button type="button" class="add-team-btn" (click)="toggleAddTeamForm()">
+        {{ showAddTeamForm ? 'Cancel' : '+ Add Team' }}
+      </button>
+    </div>
+
+    @if (teamActionMessage) {
+      <div class="user-action-message" role="status">
+        {{ teamActionMessage }}
+      </div>
+    }
+
+    @if (teamActionError) {
+      <div class="user-action-error" role="alert">
+        {{ teamActionError }}
+      </div>
+    }
+
+    @if (showAddTeamForm) {
+      <form class="add-team-form" (ngSubmit)="createTeam()">
+        <div class="form-group">
+          <label for="teamName">Team Name *</label>
+          <input
+            id="teamName"
+            name="team_name"
+            type="text"
+            [(ngModel)]="newTeam.team_name"
+            placeholder="e.g. AIML"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="academicYear">Academic Year *</label>
+          <input
+            id="academicYear"
+            name="academic_year"
+            type="text"
+            [(ngModel)]="newTeam.academic_year"
+            placeholder="e.g. 2026-27"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="teamDescription">Description</label>
+          <textarea
+            id="teamDescription"
+            name="description"
+            [(ngModel)]="newTeam.description"
+            placeholder="Enter team description"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <button type="submit" class="add-team-btn" [disabled]="teamSaving">
+          {{ teamSaving ? 'Creating...' : 'Create Team' }}
+        </button>
+      </form>
+    }
+
+    <div class="teams-grid">
+      @for (team of teams; track team.id) {
+        <div class="team-card">
+          @if (editingTeamId === team.id) {
+            <form (ngSubmit)="saveTeamChanges()" class="edit-team-form">
+              <div class="form-group">
+                <label [for]="'edit-name-' + team.id">Team Name *</label>
+                <input
+                  [id]="'edit-name-' + team.id"
+                  name="edit_team_name"
+                  type="text"
+                  [(ngModel)]="editTeamForm.team_name"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label [for]="'edit-year-' + team.id">Academic Year *</label>
+                <input
+                  [id]="'edit-year-' + team.id"
+                  name="edit_academic_year"
+                  type="text"
+                  [(ngModel)]="editTeamForm.academic_year"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label [for]="'edit-description-' + team.id">Description</label>
+                <textarea
+                  [id]="'edit-description-' + team.id"
+                  name="edit_description"
+                  [(ngModel)]="editTeamForm.description"
+                  rows="3"
+                ></textarea>
+              </div>
+
+              <div class="team-card-actions">
+                <button type="submit" class="team-btn team-btn-primary" [disabled]="teamUpdating">
+                  {{ teamUpdating ? 'Saving...' : 'Save Changes' }}
+                </button>
+
+                <button
+                  type="button"
+                  class="team-btn team-btn-secondary"
+                  (click)="cancelEditTeam()"
+                  [disabled]="teamUpdating"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          } @else {
+            <div class="team-card-content">
+              <div class="team-card-heading">
+                <h3>{{ team.team_name }}</h3>
+
+                <span
+                  class="team-status-badge"
+                  [class.active-status]="team.is_activate !== false"
+                  [class.inactive-status]="team.is_activate === false"
+                >
+                  <span class="team-status-dot"></span>
+                  {{ team.is_activate === false ? 'Inactive' : 'Active' }}
+                </span>
+              </div>
+
+              <div class="team-detail">
+                <span class="team-detail-label">Academic Year</span>
+                <span class="team-detail-value">{{ team.academic_year }}</span>
+              </div>
+
+              <div class="team-description">
+                <span class="team-detail-label">Description</span>
+                <p>{{ team.description || 'No description provided.' }}</p>
+              </div>
+            </div>
+
+            <div class="team-card-actions">
+              <button type="button" class="team-btn team-btn-primary" (click)="startEditTeam(team)">
+                Edit
+              </button>
+
+              <button
+                type="button"
+                class="team-btn"
+                [class.team-btn-danger]="team.is_activate"
+                [class.team-btn-success]="!team.is_activate"
+                (click)="toggleTeamStatus(team)"
+              >
+                {{ team.is_activate ? 'Deactivate' : 'Activate' }}
+              </button>
+            </div>
+          }
+        </div>
+      } @empty {
+        <p>No teams found.</p>
+      }
+    </div>
+  </section>
+
+  <!-- USER MANAGEMENT -->
+  <section class="user-management-section">
+    <div class="user-management-header">
+      <div>
+        <h2>User Management</h2>
+        <p>View, search, filter, and change team assignments.</p>
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="loadUsers()"
+        [disabled]="usersLoading"
+      >
+        {{ usersLoading ? 'Loading...' : '↻ Refresh Users' }}
+      </button>
+    </div>
+
+    <div class="user-summary-grid">
+      <div class="user-summary-card">
+        <span class="summary-label">Total Users</span>
+        <h3>{{ totalUsers }}</h3>
+      </div>
+
+      <div class="user-summary-card active-summary">
+        <span class="summary-label">Active Users</span>
+        <h3>{{ users.filter((account) => account.is_activate).length }}</h3>
+      </div>
+
+      <div class="user-summary-card inactive-summary">
+        <span class="summary-label">Inactive Users</span>
+        <h3>{{ users.filter((account) => !account.is_activate).length }}</h3>
+      </div>
+    </div>
+
+    <div class="user-filters">
+      <div class="filter-field">
+        <label for="userSearch">Search Users</label>
+        <input
+          id="userSearch"
+          type="text"
+          [(ngModel)]="userSearch"
+          placeholder="Search by name or email..."
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="userRoleFilter">Filter by Role</label>
+        <select id="userRoleFilter" [(ngModel)]="selectedUserRole">
+          <option value="">All Roles</option>
+          @for (role of availableUserRoles; track role) {
+            <option [value]="role">{{ role.replace('_', ' ') }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-field">
+        <label for="userTeamFilter">Filter by Team</label>
+        <select id="userTeamFilter" [(ngModel)]="selectedUserTeam">
+          <option value="">All Teams</option>
+          @for (teamId of availableUserTeams; track teamId) {
+            <option [value]="teamId">{{ getTeamName(teamId) }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-field">
+        <label for="userStatusFilter">Filter by Status</label>
+        <select id="userStatusFilter" [(ngModel)]="selectedUserStatus">
+          <option value="">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <button type="button" class="clear-user-filters-btn" (click)="clearUserFilters()">
+        Clear Filters
+      </button>
+    </div>
+
+    @if (usersError) {
+      <div class="user-error" role="alert">{{ usersError }}</div>
+    }
+
+    @if (userActionMessage) {
+      <div class="user-action-message" role="status">
+        {{ userActionMessage }}
+      </div>
+    }
+
+    @if (userActionError) {
+      <div class="user-action-error" role="alert">
+        {{ userActionError }}
+      </div>
+    }
+
+    <div class="user-table-heading">
+      <h3>Registered Accounts</h3>
+      <span>{{ filteredUsers.length }} users found</span>
+    </div>
+
+    <div class="history-table-container users-table-container">
+      <table class="history-table users-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Team</th>
+            <th>Change Team</th>
+            <th>Status</th>
+            <th>Account Action</th>
+            <th>Registered On</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          @for (account of paginatedUsers; track account.id) {
+            <tr>
+              <td>{{ account.id }}</td>
+
+              <td>
+                <div class="user-name-cell">
+                  <span class="user-avatar">
+                    {{ account.name?.charAt(0)?.toUpperCase() || '?' }}
+                  </span>
+                  <strong>{{ account.name }}</strong>
+                </div>
+              </td>
+
+              <td>{{ account.email }}</td>
+
+              <td>
+                <span
+                  class="role-badge"
+                  [class.super-admin-role]="account.role === 'SUPER_ADMIN'"
+                  [class.team-admin-role]="account.role === 'TEAM_ADMIN'"
+                  [class.member-role]="account.role === 'MEMBER'"
+                >
+                  {{ account.role?.replace('_', ' ') }}
+                </span>
+              </td>
+
+              <td>{{ getTeamName(account.team_id) }}</td>
+
+              <td>
+                <div class="change-team-control">
+                  <select
+                    [attr.aria-label]="'Select team for ' + account.name"
+                    [(ngModel)]="userTeamSelections[account.id]"
+                    [disabled]="updatingTeamUserId === account.id"
+                  >
+                    <option value="">Select team</option>
+
+                    @for (team of teams; track team.id) {
+                      <option [value]="team.id">
+                        {{ team.team_name }}
+                        {{ team.is_activate === false ? '(Inactive)' : '' }}
+                      </option>
+                    }
+                  </select>
+
+                  <button
+                    type="button"
+                    class="save-team-btn"
+                    (click)="changeUserTeam(account)"
+                    [disabled]="
+                      updatingTeamUserId === account.id || !userTeamSelections[account.id]
+                    "
+                  >
+                    {{ updatingTeamUserId === account.id ? 'Saving...' : 'Save' }}
+                  </button>
+                </div>
+              </td>
+
+              <td>
+                <span
+                  class="account-status"
+                  [class.status-active]="account.is_activate"
+                  [class.status-inactive]="!account.is_activate"
+                >
+                  {{ account.is_activate ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+
+              <td>
+                @if (account.role === 'MEMBER' || account.role === 'TEAM_ADMIN') {
+                  <button
+                    type="button"
+                    class="team-btn"
+                    [class.team-btn-danger]="account.is_activate"
+                    [class.team-btn-success]="!account.is_activate"
+                    (click)="toggleUserStatus(account)"
+                    [disabled]="updatingStatusUserId === account.id"
+                  >
+                    {{
+                      updatingStatusUserId === account.id
+                        ? 'Updating...'
+                        : account.is_activate
+                          ? 'Deactivate'
+                          : 'Activate'
+                    }}
+                  </button>
+                } @else {
+                  <span>—</span>
+                }
+              </td>
+
+              <td>
+                {{ account.created_at ? (account.created_at | date: 'dd MMM yyyy, hh:mm a') : '—' }}
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="9" class="no-users-message">No users match your search or filters.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- REGISTERED ACCOUNTS PAGINATION -->
+    <div class="table-pagination">
+      <button
+        type="button"
+        (click)="previousUsersPage()"
+        [disabled]="usersPage === 1"
+        aria-label="Previous accounts page"
+      >
+        &lt;
+      </button>
+
+      <span> Page {{ usersPage }} of {{ usersTotalPages }} </span>
+
+      <button
+        type="button"
+        (click)="nextUsersPage()"
+        [disabled]="usersPage >= usersTotalPages"
+        aria-label="Next accounts page"
+      >
+        &gt;
+      </button>
+    </div>
+  </section>
+
+  <!-- ALL TEAMS WORK HISTORY -->
+  <section class="history-section">
+    <div class="section-header">
+      <div>
+        <h2>All Teams — Work History</h2>
+        <p>Search and review submitted work records across the organization.</p>
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="refreshWorkHistory()"
+        [disabled]="historyLoading"
+      >
+        {{ historyLoading ? 'Refreshing...' : 'Refresh History' }}
+      </button>
+    </div>
+
+    <div class="filter-container">
+      <div class="filter-field search-field">
+        <label for="historySearch">Search records</label>
+        <input
+          id="historySearch"
+          type="text"
+          [(ngModel)]="historySearch"
+          (ngModelChange)="historyPage = 1"
+          placeholder="Member, email, team, or work details..."
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="historyStartDate">From Date</label>
+        <input
+          id="historyStartDate"
+          type="date"
+          [(ngModel)]="historyStartDate"
+          (ngModelChange)="historyPage = 1"
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="historyEndDate">To Date</label>
+        <input
+          id="historyEndDate"
+          type="date"
+          [(ngModel)]="historyEndDate"
+          (ngModelChange)="historyPage = 1"
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="teamFilter">Filter by Team</label>
+        <select id="teamFilter" [(ngModel)]="selectedTeam" (ngModelChange)="historyPage = 1">
+          <option value="">All Teams</option>
+          @for (team of availableTeams; track team) {
+            <option [value]="team">{{ team }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-field">
+        <label for="roleFilter">Filter by Role</label>
+        <select id="roleFilter" [(ngModel)]="selectedRole" (ngModelChange)="historyPage = 1">
+          <option value="">All Roles</option>
+          @for (role of availableRoles; track role) {
+            <option [value]="role">{{ role }}</option>
+          }
+        </select>
+      </div>
+
+      <button type="button" class="clear-btn" (click)="clearHistoryFilters()">Clear Filters</button>
+    </div>
+
+    @if (historyError) {
+      <p class="error-message">{{ historyError }}</p>
+    }
+
+    @if (historyLoading) {
+      <p class="status-message">Loading work history...</p>
+    } @else if (!historyError) {
+      <div class="history-count">
+        Showing {{ filteredWorkHistory.length }} of {{ workHistory.length }} records
+      </div>
+
+      @if (filteredWorkHistory.length > 0) {
+        <div class="history-table-container">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Member Name</th>
+                <th>Email</th>
+                <th>Team</th>
+                <th>Role</th>
+                <th>Office In</th>
+                <th>Working Points</th>
+                <th>Office Out</th>
+                <th>Points Completed</th>
+                <th>Pending Points</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (record of paginatedWorkHistory; track record.daily_work_id) {
+                <tr>
+                  <td>{{ record.work_date || '—' }}</td>
+                  <td>{{ record.user_name || '—' }}</td>
+                  <td>{{ record.user_email || '—' }}</td>
+                  <td>{{ record.team_name || '—' }}</td>
+                  <td>{{ record.user_role || '—' }}</td>
+                  <td>{{ record.office_in_time || '—' }}</td>
+                  <td class="work-details">{{ record.working_points || '—' }}</td>
+                  <td>{{ record.office_out_time || '—' }}</td>
+                  <td class="work-details">{{ record.points_completed || '—' }}</td>
+                  <td class="work-details">{{ record.pending_points || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <h3>No work records found</h3>
+          <p>Try changing your search text or date filters.</p>
+        </div>
+      }
+    }
+
+    <!-- ALL TEAMS WORK HISTORY PAGINATION -->
+    <div class="table-pagination">
+      <button
+        type="button"
+        (click)="previousHistoryPage()"
+        [disabled]="historyPage === 1"
+        aria-label="Previous work history page"
+      >
+        &lt;
+      </button>
+
+      <span> Page {{ historyPage }} of {{ historyTotalPages }} </span>
+
+      <button
+        type="button"
+        (click)="nextHistoryPage()"
+        [disabled]="historyPage >= historyTotalPages"
+        aria-label="Next work history page"
+      >
+        &gt;
+      </button>
+    </div>
+  </section>
+
+  <!-- HISTORICAL EDIT REQUESTS -->
+  <section class="history-section">
+    <div class="section-header">
+      <div>
+        <h2>Historical Edit Requests</h2>
+        <p>Review and approve or reject requests from all teams.</p>
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="loadHistoricalEditRequests()"
+        [disabled]="historicalRequestsLoading"
+      >
+        {{ historicalRequestsLoading ? 'Refreshing...' : 'Refresh Requests' }}
+      </button>
+    </div>
+
+    <!-- HISTORICAL EDIT REQUESTS FILTERS -->
+    <div class="history-filters">
+      <div class="filter-group">
+        <label for="requestsSearch">Search requests</label>
+        <input
+          id="requestsSearch"
+          type="text"
+          [(ngModel)]="requestsSearch"
+          (ngModelChange)="requestsPage = 1"
+          placeholder="Member, email, team, or reason..."
+        />
+      </div>
+
+      <div class="filter-group">
+        <label for="requestsStatus">Request status</label>
+        <select id="requestsStatus" [(ngModel)]="requestsStatus" (ngModelChange)="requestsPage = 1">
+          <option value="">All statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="requestsTeam">Team</label>
+        <select id="requestsTeam" [(ngModel)]="requestsTeam" (ngModelChange)="requestsPage = 1">
+          <option value="">All teams</option>
+          @for (team of historicalRequestTeams; track team) {
+            <option [value]="team">{{ team }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="requestsStartDate">Work date from</label>
+        <input
+          id="requestsStartDate"
+          type="date"
+          [(ngModel)]="requestsStartDate"
+          (ngModelChange)="requestsPage = 1"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label for="requestsEndDate">Work date to</label>
+        <input
+          id="requestsEndDate"
+          type="date"
+          [(ngModel)]="requestsEndDate"
+          (ngModelChange)="requestsPage = 1"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="
+          requestsSearch = '';
+          requestsStatus = '';
+          requestsTeam = '';
+          requestsStartDate = '';
+          requestsEndDate = '';
+          requestsPage = 1
+        "
+      >
+        Clear Filters
+      </button>
+    </div>
+
+    @if (historicalRequestMessage) {
+      <p class="user-action-message" role="status">
+        {{ historicalRequestMessage }}
+      </p>
+    }
+
+    @if (historicalRequestError) {
+      <p class="user-action-error" role="alert">
+        {{ historicalRequestError }}
+      </p>
+    }
+
+    @if (historicalRequestsError) {
+      <p class="error-message">{{ historicalRequestsError }}</p>
+    }
+
+    @if (historicalRequestsLoading) {
+      <p class="status-message">Loading historical edit requests...</p>
+    } @else if (!historicalRequestsError) {
+      <div class="history-table-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>Work Date</th>
+              <th>Member</th>
+              <th>Team</th>
+              <th>Requested By</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th>Review Comment</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (request of paginatedHistoricalRequests; track request.request_id) {
+              <tr>
+                <td>{{ request.request_id }}</td>
+                <td>{{ request.work_date | date: 'dd MMM yyyy' }}</td>
+                <td>{{ request.requester_name || 'User #' + request.requester_id }}</td>
+                <td>{{ request.team_name || '—' }}</td>
+                <td>{{ request.requester_role || '—' }}</td>
+                <td class="work-details">{{ request.request_reason || '—' }}</td>
+                <td>
+                  <span
+                    class="request-status-badge"
+                    [class.status-pending]="request.status === 'PENDING'"
+                    [class.status-approved]="request.status === 'APPROVED'"
+                    [class.status-rejected]="request.status === 'REJECTED'"
+                  >
+                    {{ request.status }}
+                  </span>
+                </td>
+                <td>
+                  @if (request.status === 'PENDING') {
+                    <textarea
+                      [name]="'review-comment-' + request.request_id"
+                      [(ngModel)]="reviewComments[request.request_id]"
+                      placeholder="Enter review comment"
+                      rows="2"
+                    ></textarea>
+                  } @else {
+                    {{ request.review_comment || '—' }}
+                  }
+                </td>
+                <td>
+                  @if (request.status === 'PENDING') {
+                    <div class="team-card-actions">
+                      <button
+                        type="button"
+                        class="team-btn team-btn-success"
+                        (click)="reviewHistoricalRequest(request, 'APPROVED')"
+                        [disabled]="reviewingRequestId === request.request_id"
+                      >
+                        {{ reviewingRequestId === request.request_id ? 'Saving...' : 'Approve' }}
+                      </button>
+
+                      <button
+                        type="button"
+                        class="team-btn team-btn-danger"
+                        (click)="reviewHistoricalRequest(request, 'REJECTED')"
+                        [disabled]="reviewingRequestId === request.request_id"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  } @else {
+                    <span>Reviewed</span>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="9" class="no-users-message">No historical edit requests found.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- HISTORICAL EDIT REQUESTS PAGINATION -->
+      <div class="table-pagination">
+        <button
+          type="button"
+          (click)="previousRequestsPage()"
+          [disabled]="requestsPage === 1"
+          aria-label="Previous historical edit requests page"
+        >
+          &lt;
+        </button>
+
+        <span> Page {{ requestsPage }} of {{ requestsTotalPages }} </span>
+
+        <button
+          type="button"
+          (click)="nextRequestsPage()"
+          [disabled]="requestsPage >= requestsTotalPages"
+          aria-label="Next historical edit requests page"
+        >
+          &gt;
+        </button>
+      </div>
+    }
+  </section>
+
+  <!-- HISTORICAL WORK AUDIT -->
+  <section class="history-section">
+    <div class="section-header">
+      <div>
+        <h2>Historical Work Audit</h2>
+        <p>Review previous and updated values for historical work edits.</p>
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="loadHistoricalWorkAudit()"
+        [disabled]="historicalAuditLoading"
+      >
+        {{ historicalAuditLoading ? 'Refreshing...' : 'Refresh Audit' }}
+      </button>
+    </div>
+
+    <!-- Historical Work Audit Filters -->
+    <div class="history-filters">
+      <div class="filter-group">
+        <label for="auditSearch">Search Audit Records</label>
+        <input
+          id="auditSearch"
+          type="text"
+          [(ngModel)]="auditSearch"
+          (ngModelChange)="auditPage = 1"
+          placeholder="Search member, team, editor, reviewer..."
+        />
+      </div>
+
+      <div class="filter-group">
+        <label for="auditTeam">Filter by Team</label>
+        <select id="auditTeam" [(ngModel)]="auditTeam" (ngModelChange)="auditPage = 1">
+          <option value="">All Teams</option>
+          @for (team of historicalAuditTeams; track team) {
+            <option [value]="team">{{ team }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="auditStartDate">Work Date From</label>
+        <input
+          id="auditStartDate"
+          type="date"
+          [(ngModel)]="auditStartDate"
+          (ngModelChange)="auditPage = 1"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label for="auditEndDate">Work Date To</label>
+        <input
+          id="auditEndDate"
+          type="date"
+          [(ngModel)]="auditEndDate"
+          (ngModelChange)="auditPage = 1"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        (click)="
+          auditSearch = ''; auditTeam = ''; auditStartDate = ''; auditEndDate = ''; auditPage = 1
+        "
+      >
+        Clear Filters
+      </button>
+    </div>
+    <!-- End Historical Work Audit Filters -->
+
+    @if (historicalAuditError) {
+      <p class="error-message">{{ historicalAuditError }}</p>
+    }
+
+    @if (historicalAuditLoading) {
+      <p class="status-message">Loading audit records...</p>
+    } @else if (!historicalAuditError) {
+      <p class="history-count">Total audit records: {{ historicalAuditRecords.length }}</p>
+
+      <div class="history-table-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Audit ID</th>
+              <th>Work Date</th>
+              <th>Member</th>
+              <th>Team</th>
+              <th>Edited By</th>
+              <th>Reviewed By</th>
+              <th>Request ID</th>
+              <th>Edited At</th>
+              <th>Changed Values</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (audit of paginatedHistoricalAudit; track audit.audit_id) {
+              <tr>
+                <td>{{ audit.audit_id }}</td>
+                <td>{{ audit.work_date | date: 'dd MMM yyyy' }}</td>
+                <td>{{ audit.work_owner_name || 'User #' + audit.work_owner_id }}</td>
+                <td>{{ audit.team_name || '—' }}</td>
+                <td>{{ audit.editor_name || 'User #' + audit.edited_by }}</td>
+                <td>{{ audit.reviewer_name || 'User #' + audit.reviewed_by }}</td>
+                <td>{{ audit.edit_request_id }}</td>
+                <td>{{ audit.edited_at | date: 'dd MMM yyyy, hh:mm a' }}</td>
+                <td class="work-details">
+                  <details>
+                    <summary>View changes</summary>
+
+                    <div class="audit-values">
+                      <strong>Previous Values</strong>
+                      <pre>{{ audit.old_values | json }}</pre>
+
+                      <strong>Updated Values</strong>
+                      <pre>{{ audit.new_values | json }}</pre>
+                    </div>
+                  </details>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="9" class="no-users-message">No audit records found.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- HISTORICAL WORK AUDIT PAGINATION -->
+      <div class="table-pagination">
+        <button
+          type="button"
+          (click)="previousAuditPage()"
+          [disabled]="auditPage === 1"
+          aria-label="Previous audit page"
+        >
+          &lt;
+        </button>
+
+        <span> Page {{ auditPage }} of {{ auditTotalPages }} </span>
+
+        <button
+          type="button"
+          (click)="nextAuditPage()"
+          [disabled]="auditPage >= auditTotalPages"
+          aria-label="Next audit page"
+        >
+          &gt;
+        </button>
+      </div>
+    }
+  </section>
 </div>

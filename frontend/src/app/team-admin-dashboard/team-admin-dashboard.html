@@ -1,9 +1,9 @@
-
 <div class="dashboard-container">
+  <!-- Dashboard Header -->
   <header class="dashboard-header">
     <div>
       <h1>Team Admin Dashboard</h1>
-      <p>Manage your team and monitor daily work.</p>
+      <p>Manage your team and review daily work submissions.</p>
     </div>
 
     <button type="button" class="logout-btn" (click)="logout()">
@@ -11,135 +11,313 @@
     </button>
   </header>
 
+  <!-- Welcome Section -->
   @if (user) {
     <section class="welcome-section">
       <div>
-        <h2>Welcome, {{ user.name }}</h2>
+        <h2>Welcome, {{ user.name }}!</h2>
         <p>{{ user.email }}</p>
       </div>
 
-      <div class="team-badge">
-        {{ user.team_name || 'Assigned Team' }}
-      </div>
+      <span class="team-badge">
+        {{ user.team_name || 'Team Admin' }}
+      </span>
     </section>
   }
 
+  <!-- Dashboard Loading and Error -->
   @if (dashboardLoading) {
     <p class="status-message">Loading dashboard...</p>
   }
 
   @if (dashboardError) {
-    <p class="error-message">{{ dashboardError }}</p>
-    <button type="button" class="secondary-btn" (click)="loadDashboard()">
-      Retry
-    </button>
+    <div class="error-message" role="alert">
+      {{ dashboardError }}
+    </div>
   }
 
-  <section class="summary-grid">
-    <article class="summary-card">
-      <h3>Total Work Days</h3>
-      <p class="summary-value">{{ summary.total_work_days }}</p>
-    </article>
+  <!-- Summary Cards -->
+  @if (!dashboardLoading && !dashboardError) {
+    <section class="summary-grid">
+      <article class="summary-card">
+        <h3>Total Work Days</h3>
+        <p class="summary-value">{{ summary.total_work_days }}</p>
+      </article>
 
-    <article class="summary-card">
-      <h3>Completed Days</h3>
-      <p class="summary-value">{{ summary.completed_days }}</p>
-    </article>
+      <article class="summary-card">
+        <h3>Completed Days</h3>
+        <p class="summary-value">{{ summary.completed_days }}</p>
+      </article>
 
-    <article class="summary-card">
-      <h3>Pending Days</h3>
-      <p class="summary-value">{{ summary.pending_days }}</p>
-    </article>
+      <article class="summary-card">
+        <h3>Pending Days</h3>
+        <p class="summary-value">{{ summary.pending_days }}</p>
+      </article>
 
-    <article class="summary-card">
-      <h3>Latest Work Date</h3>
-      <p class="summary-date">
-        {{ summary.latest_work_date || 'No records yet' }}
-      </p>
-    </article>
-  </section>
+      <article class="summary-card">
+        <h3>Latest Work Date</h3>
+        <p class="summary-date">{{ summary.latest_work_date || '—' }}</p>
+      </article>
+    </section>
+  }
 
-  <section class="history-section">
-    <div class="history-heading">
+  <!-- ====================================================== -->
+  <!-- TEAM MEMBER MANAGEMENT -->
+  <!-- ====================================================== -->
+  <section class="content-section">
+    <div class="section-heading">
       <div>
-        <h2>Team Work History</h2>
-        <p>View daily work records for your assigned team.</p>
+        <h2>Team Member Management</h2>
+        <p>View team members and manage their account status.</p>
       </div>
 
       <button
         type="button"
-        class="refresh-btn"
-        (click)="refreshWorkHistory()"
+        class="primary-btn"
+        (click)="loadTeamMembers()"
+        [disabled]="membersLoading"
+      >
+        {{ membersLoading ? 'Loading...' : 'Refresh Members' }}
+      </button>
+    </div>
+
+    @if (memberStatusMessage) {
+      <div class="success-message" role="status">
+        {{ memberStatusMessage }}
+      </div>
+    }
+
+    @if (membersError) {
+      <div class="error-message" role="alert">
+        {{ membersError }}
+      </div>
+    }
+
+    <!-- Member Summary -->
+    <div class="member-summary-grid">
+      <article class="member-summary-card total-members-card">
+        <div class="member-card-icon">T</div>
+        <div>
+          <p>Total Members</p>
+          <h3>{{ teamMembers.length }}</h3>
+        </div>
+      </article>
+
+      <article class="member-summary-card active-members-card">
+        <div class="member-card-icon">A</div>
+        <div>
+          <p>Active Members</p>
+          <h3>
+            {{ teamMembers.filter(member => member.is_activate).length }}
+          </h3>
+        </div>
+      </article>
+
+      <article class="member-summary-card inactive-members-card">
+        <div class="member-card-icon">I</div>
+        <div>
+          <p>Inactive Members</p>
+          <h3>
+            {{ teamMembers.filter(member => !member.is_activate).length }}
+          </h3>
+        </div>
+      </article>
+    </div>
+
+    <!-- Member Search -->
+    <div class="member-toolbar">
+      <div class="filter-field">
+        <label for="memberSearch">Search Team Members</label>
+        <input
+          id="memberSearch"
+          type="text"
+          [(ngModel)]="memberSearch"
+          placeholder="Search by name, email, or team..."
+        />
+      </div>
+
+      <span class="record-count">
+        {{ filteredTeamMembers.length }} members found
+      </span>
+    </div>
+
+    @if (membersLoading) {
+      <p class="status-message">Loading team members...</p>
+    } @else {
+      <div class="members-table-container">
+        <table class="data-table members-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (member of paginatedTeamMembers; track member.user_id) {
+              <tr>
+                <td class="member-name">{{ member.name || '—' }}</td>
+                <td>{{ member.email || '—' }}</td>
+                <td>{{ member.role || 'MEMBER' }}</td>
+
+                <td>
+                  <span
+                    class="status-badge"
+                    [class.status-active]="member.is_activate"
+                    [class.status-inactive]="!member.is_activate"
+                  >
+                    {{ member.is_activate ? 'Active' : 'Inactive' }}
+                  </span>
+                </td>
+
+                <td>
+                  <button
+                    type="button"
+                    class="action-btn"
+                    [class.deactivate-button]="member.is_activate"
+                    [class.activate-button]="!member.is_activate"
+                    [disabled]="updatingMemberId === member.user_id"
+                    (click)="toggleMemberStatus(member)"
+                  >
+                    {{
+                      updatingMemberId === member.user_id
+                        ? 'Updating...'
+                        : member.is_activate
+                          ? 'Deactivate'
+                          : 'Activate'
+                    }}
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <h3>No team members found</h3>
+                    <p>Try a different search term.</p>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Member Pagination -->
+      @if (filteredTeamMembers.length > 0) {
+        <div class="pagination-container">
+          <span class="pagination-info">
+            Page {{ membersPage }} of {{ totalMembersPages }}
+            ({{ filteredTeamMembers.length }} records)
+          </span>
+
+          <div class="pagination-controls">
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeMembersPage(membersPage - 1)"
+              [disabled]="membersPage <= 1"
+            >
+              Previous
+            </button>
+
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeMembersPage(membersPage + 1)"
+              [disabled]="membersPage >= totalMembersPages"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+
+  <!-- ====================================================== -->
+  <!-- TEAM WORK HISTORY -->
+  <!-- ====================================================== -->
+  <section class="content-section history-section">
+    <div class="section-heading">
+      <div>
+        <h2>Team Work History</h2>
+        <p>Search and review work records from your assigned team.</p>
+      </div>
+
+      <button
+        type="button"
+        class="primary-btn"
+        (click)="loadWorkHistory()"
         [disabled]="historyLoading"
       >
         {{ historyLoading ? 'Loading...' : 'Refresh History' }}
       </button>
     </div>
 
+    <!-- History Filters -->
     <div class="history-filters">
       <div class="filter-field search-field">
-        <label for="historySearch">Search records</label>
+        <label for="historySearch">Search Records</label>
         <input
           id="historySearch"
-          type="search"
+          type="text"
           [(ngModel)]="historySearch"
-          placeholder="Name, email, date or work details"
+          placeholder="Member, date, team, or work details..."
         />
       </div>
 
       <div class="filter-field">
-        <label for="historyStartDate">From date</label>
+        <label for="historyStartDate">From Date</label>
         <input
           id="historyStartDate"
           type="date"
           [(ngModel)]="historyStartDate"
-          [max]="historyEndDate || undefined"
         />
       </div>
 
       <div class="filter-field">
-        <label for="historyEndDate">To date</label>
+        <label for="historyEndDate">To Date</label>
         <input
           id="historyEndDate"
           type="date"
           [(ngModel)]="historyEndDate"
-          [min]="historyStartDate || undefined"
         />
       </div>
 
       <button
         type="button"
-        class="clear-btn"
+        class="secondary-btn clear-btn"
         (click)="clearHistoryFilters()"
       >
         Clear Filters
       </button>
     </div>
 
-    <div class="history-count">
-      Showing {{ filteredWorkHistory.length }} of {{ workHistory.length }} records
-    </div>
+    @if (historyError) {
+      <div class="error-message" role="alert">
+        {{ historyError }}
+      </div>
+    }
 
     @if (historyLoading) {
-      <p class="status-message">Loading team work history...</p>
-    }
+      <p class="status-message">Loading work history...</p>
+    } @else if (!historyError) {
+      <div class="history-count">
+        Showing {{ filteredWorkHistory.length }} of
+        {{ workHistory.length }} work records
+      </div>
 
-    @if (historyError) {
-      <p class="error-message">{{ historyError }}</p>
-      <button type="button" class="secondary-btn" (click)="loadWorkHistory()">
-        Retry
-      </button>
-    }
-
-    @if (!historyLoading && !historyError) {
       @if (filteredWorkHistory.length > 0) {
         <div class="history-table-container">
-          <table class="history-table">
+          <table class="data-table history-table">
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Member Name</th>
-                <th>Email</th>
+                <th>Member</th>
                 <th>Office In</th>
                 <th>Working Points</th>
                 <th>Office Out</th>
@@ -149,33 +327,512 @@
             </thead>
 
             <tbody>
-              @for (record of filteredWorkHistory; track record.daily_work_id) {
+              @for (
+                record of paginatedWorkHistory;
+                track record.daily_work_id
+              ) {
                 <tr>
-                  <td>{{ record.work_date || '—' }}</td>
-                  <td>{{ record.user_name || '—' }}</td>
-                  <td>{{ record.user_email || '—' }}</td>
+                  <td>
+                    {{ record.work_date | date: 'dd-MM-yyyy' }}
+                  </td>
+
+                  <td class="member-name">
+                    {{ record.user_name || record.name || '—' }}
+                  </td>
+
                   <td>{{ record.office_in_time || '—' }}</td>
+
                   <td class="work-details">
                     {{ record.working_points || '—' }}
                   </td>
+
                   <td>{{ record.office_out_time || '—' }}</td>
+
                   <td class="work-details">
                     {{ record.points_completed || '—' }}
                   </td>
+
                   <td class="work-details">
                     {{ record.pending_points || '—' }}
                   </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7">No matching work records found.</td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
+
+        <!-- Work History Pagination -->
+        <div class="pagination-container">
+          <span class="pagination-info">
+            Page {{ historyPage }} of {{ totalHistoryPages }}
+            ({{ filteredWorkHistory.length }} records)
+          </span>
+
+          <div class="pagination-controls">
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeHistoryPage(historyPage - 1)"
+              [disabled]="historyPage <= 1"
+            >
+              Previous
+            </button>
+
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeHistoryPage(historyPage + 1)"
+              [disabled]="historyPage >= totalHistoryPages"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       } @else {
         <div class="empty-state">
-          <h3>No work records found</h3>
+          <h3>No matching work records</h3>
           <p>
-            There are no matching records. Try changing the search or date filters.
+            Try changing your search term or date range, or clear the filters.
           </p>
+        </div>
+      }
+    }
+  </section>
+
+  <!-- ====================================================== -->
+  <!-- HISTORICAL EDIT REQUESTS -->
+  <!-- ====================================================== -->
+  <section class="content-section history-section">
+    <div class="section-heading">
+      <div>
+        <h2>Historical Edit Requests</h2>
+        <p>Review requests to change previously submitted work records.</p>
+      </div>
+
+      <button
+        type="button"
+        class="primary-btn"
+        (click)="loadHistoricalEditRequests()"
+        [disabled]="historicalRequestsLoading || reviewingRequestId !== null"
+      >
+        {{
+          historicalRequestsLoading
+            ? 'Loading...'
+            : 'Refresh Requests'
+        }}
+      </button>
+    </div>
+
+    <!-- Edit Request Filters -->
+    <div class="history-filters">
+      <div class="filter-field search-field">
+        <label for="requestSearch">Search Requests</label>
+        <input
+          id="requestSearch"
+          type="text"
+          [(ngModel)]="requestSearch"
+          placeholder="Search requester, reason, date, or status..."
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="requestStatusFilter">Status</label>
+        <select
+          id="requestStatusFilter"
+          [(ngModel)]="requestStatusFilter"
+        >
+          <option value="">All Statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+
+      <div class="filter-field">
+        <label for="requestStartDate">From Work Date</label>
+        <input
+          id="requestStartDate"
+          type="date"
+          [(ngModel)]="requestStartDate"
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="requestEndDate">To Work Date</label>
+        <input
+          id="requestEndDate"
+          type="date"
+          [(ngModel)]="requestEndDate"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="secondary-btn clear-btn"
+        (click)="clearRequestFilters()"
+      >
+        Clear Filters
+      </button>
+    </div>
+
+    @if (historicalRequestsError) {
+      <div class="error-message" role="alert">
+        {{ historicalRequestsError }}
+      </div>
+    }
+
+    @if (historicalRequestsLoading) {
+      <p class="status-message">Loading historical edit requests...</p>
+    } @else if (!historicalRequestsError) {
+      <div class="history-count">
+        Showing {{ filteredHistoricalEditRequests.length }} of
+        {{ historicalEditRequests.length }} requests
+      </div>
+
+      @if (filteredHistoricalEditRequests.length > 0) {
+        <div class="history-table-container">
+          <table class="data-table history-table">
+            <thead>
+              <tr>
+                <th>Work Date</th>
+                <th>Requested By</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Requested At</th>
+                <th>Review Comment</th>
+                <th>Review Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (
+                request of paginatedHistoricalEditRequests;
+                track request.request_id
+              ) {
+                <tr>
+                  <td>
+                    {{
+                      request.work_date
+                        ? (request.work_date | date: 'dd-MM-yyyy')
+                        : '—'
+                    }}
+                  </td>
+
+                  <td class="member-name">
+                    {{
+                      request.requester_name ||
+                      request.requested_by_name ||
+                      '—'
+                    }}
+                  </td>
+
+                  <td class="work-details">
+                    {{ request.request_reason || '—' }}
+                  </td>
+
+                  <td>
+                    <span
+                      class="status-badge"
+                      [class.status-active]="request.status === 'APPROVED'"
+                      [class.status-inactive]="request.status === 'REJECTED'"
+                    >
+                      {{ request.status || 'PENDING' }}
+                    </span>
+                  </td>
+
+                  <td>
+                    {{
+                      request.requested_at
+                        ? (request.requested_at | date: 'dd-MM-yyyy, h:mm a')
+                        : '—'
+                    }}
+                  </td>
+
+                  <td class="work-details">
+                    {{ request.review_comment || '—' }}
+                  </td>
+
+                  <td>
+                    @if (request.status === 'PENDING') {
+                      <div class="request-actions">
+                        <button
+                          type="button"
+                          class="action-btn activate-button"
+                          [disabled]="reviewingRequestId !== null"
+                          (click)="reviewHistoricalRequest(request, 'APPROVED')"
+                        >
+                          {{
+                            reviewingRequestId === request.request_id
+                              ? 'Approving...'
+                              : 'Approve'
+                          }}
+                        </button>
+
+                        <button
+                          type="button"
+                          class="action-btn deactivate-button"
+                          [disabled]="reviewingRequestId !== null"
+                          (click)="reviewHistoricalRequest(request, 'REJECTED')"
+                        >
+                          {{
+                            reviewingRequestId === request.request_id
+                              ? 'Rejecting...'
+                              : 'Reject'
+                          }}
+                        </button>
+                      </div>
+
+                      <textarea
+                        rows="2"
+                        [ngModel]="reviewComments[request.request_id] || ''"
+                        (ngModelChange)="reviewComments[request.request_id] = $event"
+                        [name]="'review-comment-' + request.request_id"
+                        placeholder="Optional review comment"
+                      ></textarea>
+                    } @else {
+                      <span>Reviewed</span>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7">No historical edit requests found.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Edit Request Pagination -->
+        <div class="pagination-container">
+          <span class="pagination-info">
+            Page {{ requestsPage }} of {{ totalRequestsPages }}
+            ({{ filteredHistoricalEditRequests.length }} records)
+          </span>
+
+          <div class="pagination-controls">
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeRequestsPage(requestsPage - 1)"
+              [disabled]="requestsPage <= 1"
+            >
+              Previous
+            </button>
+
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeRequestsPage(requestsPage + 1)"
+              [disabled]="requestsPage >= totalRequestsPages"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <h3>No matching historical edit requests</h3>
+          <p>Try changing the search, status, or date filters.</p>
+        </div>
+      }
+    }
+  </section>
+
+  <!-- ====================================================== -->
+  <!-- HISTORICAL WORK AUDIT -->
+  <!-- ====================================================== -->
+  <section class="content-section history-section audit-section">
+    <div class="section-heading">
+      <div>
+        <h2>Historical Work Audit</h2>
+        <p>
+          Review changes made to historical work records in your assigned team.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="primary-btn"
+        (click)="refreshHistoricalWorkAudit()"
+        [disabled]="historicalAuditLoading"
+      >
+        {{
+          historicalAuditLoading
+            ? 'Loading...'
+            : 'Refresh Audit'
+        }}
+      </button>
+    </div>
+
+    <!-- Audit Filters -->
+    <div class="history-filters">
+      <div class="filter-field search-field">
+        <label for="auditSearch">Search Audit Records</label>
+        <input
+          id="auditSearch"
+          type="text"
+          [(ngModel)]="auditSearch"
+          placeholder="Search member, team, editor, reviewer, or date..."
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="auditStartDate">From Work Date</label>
+        <input
+          id="auditStartDate"
+          type="date"
+          [(ngModel)]="auditStartDate"
+        />
+      </div>
+
+      <div class="filter-field">
+        <label for="auditEndDate">To Work Date</label>
+        <input
+          id="auditEndDate"
+          type="date"
+          [(ngModel)]="auditEndDate"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="secondary-btn clear-btn"
+        (click)="clearAuditFilters()"
+      >
+        Clear Filters
+      </button>
+    </div>
+
+    @if (historicalAuditError) {
+      <div class="error-message" role="alert">
+        {{ historicalAuditError }}
+      </div>
+
+      <button
+        type="button"
+        class="secondary-btn"
+        (click)="refreshHistoricalWorkAudit()"
+        [disabled]="historicalAuditLoading"
+      >
+        Retry
+      </button>
+    }
+
+    @if (historicalAuditLoading) {
+      <p class="status-message">Loading historical work audit...</p>
+    } @else if (!historicalAuditError) {
+      <div class="history-count">
+        Showing {{ filteredHistoricalWorkAudit.length }} of
+        {{ historicalWorkAudit.length }} audit records
+      </div>
+
+      @if (filteredHistoricalWorkAudit.length > 0) {
+        <div class="history-table-container">
+          <table class="data-table history-table audit-table">
+            <thead>
+              <tr>
+                <th>Work Date</th>
+                <th>Team</th>
+                <th>Member</th>
+                <th>Edited By</th>
+                <th>Reviewed By</th>
+                <th>Old Values</th>
+                <th>New Values</th>
+                <th>Edited At</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (
+                audit of paginatedHistoricalWorkAudit;
+                track audit.audit_id
+              ) {
+                <tr>
+                  <td>
+                    {{
+                      audit.work_date
+                        ? (audit.work_date | date: 'dd-MM-yyyy')
+                        : '—'
+                    }}
+                  </td>
+
+                  <td>{{ audit.team_name || '—' }}</td>
+
+                  <td class="member-name">
+                    {{ audit.work_owner_name || '—' }}
+                  </td>
+
+                  <td>{{ audit.editor_name || '—' }}</td>
+
+                  <td>{{ audit.reviewer_name || '—' }}</td>
+
+                  <td class="audit-change-cell">
+                    <details class="audit-details">
+                      <summary>View changes</summary>
+                      <pre class="audit-values">{{ audit.old_values | json }}</pre>
+                    </details>
+                  </td>
+
+                  <td class="audit-change-cell">
+                    <details class="audit-details">
+                      <summary>View changes</summary>
+                      <pre class="audit-values">{{ audit.new_values | json }}</pre>
+                    </details>
+                  </td>
+
+                  <td>
+                    {{
+                      audit.edited_at
+                        ? (audit.edited_at | date: 'dd-MM-yyyy, h:mm a')
+                        : '—'
+                    }}
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8">No historical audit records found.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Audit Pagination -->
+        <div class="pagination-container">
+          <span class="pagination-info">
+            Page {{ auditPage }} of {{ totalAuditPages }}
+            ({{ filteredHistoricalWorkAudit.length }} records)
+          </span>
+
+          <div class="pagination-controls">
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeAuditPage(auditPage - 1)"
+              [disabled]="auditPage <= 1"
+            >
+              Previous
+            </button>
+
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="changeAuditPage(auditPage + 1)"
+              [disabled]="auditPage >= totalAuditPages"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <h3>No matching historical work audit records</h3>
+          <p>Try changing the search or date filters.</p>
         </div>
       }
     }

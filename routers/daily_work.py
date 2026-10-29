@@ -707,12 +707,12 @@ def get_team_daily_work_by_date(
 # 10. SUPER_ADMIN - ALL DAILY WORK
 # ============================================================
 
+
 @router.get("/admin")
 def get_all_daily_work(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
     # Check SUPER_ADMIN permission
     if current_user.role != "SUPER_ADMIN":
         raise HTTPException(
@@ -728,18 +728,26 @@ def get_all_daily_work(
     result = []
 
     for work in daily_work:
-
-        # Get user who submitted the work
+        # Get the user who submitted this work
         user = db.query(User).filter(
             User.id == work.user_id
         ).first()
+
+        # Get the user's team
+        team = None
+        if user and user.team_id:
+            team = db.query(Team).filter(
+                Team.id == user.team_id
+            ).first()
 
         result.append({
             "daily_work_id": work.id,
             "user_id": work.user_id,
             "user_name": user.name if user else None,
             "user_email": user.email if user else None,
+            "user_role": user.role if user else None,
             "team_id": user.team_id if user else None,
+            "team_name": team.team_name if team else None,
             "work_date": work.work_date,
             "office_in_time": work.office_in_time,
             "working_points": work.working_points,
@@ -756,6 +764,7 @@ def get_all_daily_work(
         "total_records": len(result),
         "daily_work": result
     }
+
 
 # ============================================================
 # 10.7 SUPER_ADMIN OVERALL SUMMARY
@@ -1320,6 +1329,103 @@ def review_historical_edit_request(
         "reviewed_at": edit_request.reviewed_at
     }
 
+
+@router.get("/historical-edit-requests")
+def get_historical_edit_requests(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = (
+        db.query(HistoricalEditRequest, DailyWork, User)
+        .join(
+            DailyWork,
+            HistoricalEditRequest.daily_work_id == DailyWork.id
+        )
+        .join(
+            User,
+            HistoricalEditRequest.requested_by == User.id
+        )
+    )
+
+    # MEMBER: view only their own requests
+    if current_user.role == "MEMBER":
+        query = query.filter(
+            HistoricalEditRequest.requested_by == current_user.id
+        )
+
+    # TEAM_ADMIN: view requests from members in assigned teams
+    elif current_user.role == "TEAM_ADMIN":
+        assignments = db.query(TeamAdmin).filter(
+            TeamAdmin.user_id == current_user.id
+        ).all()
+
+        team_ids = [item.team_id for item in assignments]
+
+        if not team_ids:
+            return {
+                "total_records": 0,
+                "requests": []
+            }
+
+        query = query.filter(
+            User.team_id.in_(team_ids),
+            User.role == "MEMBER"
+        )
+
+    # SUPER_ADMIN: view all requests
+    elif current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to view historical edit requests."
+        )
+
+    records = query.order_by(
+        HistoricalEditRequest.requested_at.desc()
+    ).all()
+
+    requests = []
+
+    for edit_request, work, requester in records:
+        reviewer = None
+
+        if edit_request.reviewed_by is not None:
+            reviewer = db.query(User).filter(
+                User.id == edit_request.reviewed_by
+            ).first()
+
+        team = None
+
+        if requester.team_id:
+            team = db.query(Team).filter(
+                Team.id == requester.team_id
+            ).first()
+
+        requests.append({
+            "request_id": edit_request.id,
+            "daily_work_id": edit_request.daily_work_id,
+            "work_date": work.work_date,
+            "work_owner_id": work.user_id,
+            "requester_id": requester.id,
+            "requester_name": requester.name,
+            "requester_role": requester.role,
+            "team_id": requester.team_id,
+            "team_name": team.team_name if team else None,
+            "request_reason": edit_request.request_reason,
+            "status": edit_request.status,
+            "reviewed_by": edit_request.reviewed_by,
+            "reviewer_name": reviewer.name if reviewer else None,
+            "review_comment": edit_request.review_comment,
+            "requested_at": edit_request.requested_at,
+            "reviewed_at": edit_request.reviewed_at,
+            "used_at": edit_request.used_at
+        })
+
+    return {
+        "total_records": len(requests),
+        "requests": requests
+    }
+
+
 @router.put("/historical-work/{daily_work_id}/edit")
 def edit_historical_work(
     daily_work_id: int,
@@ -1510,6 +1616,14 @@ def get_historical_work_edit_audit(
         editor = db.query(User).filter(
             User.id == audit.edited_by
         ).first()
+
+        team = None
+
+        if editor_work_owner.team_id:
+            team = db.query(Team).filter(
+                Team.id == editor_work_owner.team_id
+            ).first()
+
         edit_request = db.query(HistoricalEditRequest).filter(
             HistoricalEditRequest.id == audit.edit_request_id
         ).first()
@@ -1525,6 +1639,8 @@ def get_historical_work_edit_audit(
             "work_date": work.work_date,
             "work_owner_id": editor_work_owner.id,
             "work_owner_name": editor_work_owner.name,
+            "team_id": editor_work_owner.team_id,
+            "team_name": team.team_name if team else None,
             "edit_request_id": audit.edit_request_id,
             "requested_by": edit_request.requested_by if edit_request else None,
             "reviewed_by": edit_request.reviewed_by if edit_request else None,

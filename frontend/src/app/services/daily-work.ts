@@ -79,6 +79,16 @@ export class DailyWorkService {
     );
   }
 
+  getHistoricalEditRequests(): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    const headers = new HttpHeaders({
+      Authorization: `Bearer ${token}`,
+    });
+
+    return this.http.get(`${this.apiUrl}/historical-edit-requests`, { headers });
+  }
+
   // 2. Approve or reject a historical edit request
   reviewHistoricalEdit(
     requestId: number,
@@ -144,6 +154,16 @@ export class DailyWorkService {
     });
   }
 
+  getTeamMembers(): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.get<any>('http://localhost:8000/users/team-members', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
   getTeamWorkHistory(): Observable<any> {
     const token = localStorage.getItem('access_token');
 
@@ -161,6 +181,87 @@ export class DailyWorkService {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+    });
+  }
+
+  getAdminOverallSummary(): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.get<any>(`${this.apiUrl}/admin/summary`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
+  getAllUsers(): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.get<any>('http://localhost:8000/users/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
+  getAllTeams(): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.get<any>('http://localhost:8000/teams/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
+  updateUserTeam(userId: number, teamId: number): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.put<any>(
+      `http://localhost:8000/users/${userId}/team`,
+      { team_id: teamId },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+  }
+
+  createTeam(team: {
+    team_name: string;
+    academic_year: string;
+    description: string;
+  }): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.post<any>('http://localhost:8000/teams/', team, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  updateTeam(
+    teamId: number,
+    team: {
+      team_name: string;
+      academic_year: string;
+      description: string;
+      is_activate: boolean;
+    },
+  ): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.put<any>(`http://localhost:8000/teams/${teamId}`, team, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  updateUserStatus(userId: number, isActivate: boolean): Observable<any> {
+    const token = localStorage.getItem('access_token');
+
+    return this.http.patch<any>(`http://localhost:8000/users/${userId}/activate`, null, {
+      params: { is_activate: String(isActivate) },
+      headers: { Authorization: `Bearer ${token}` },
     });
   }
 }

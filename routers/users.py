@@ -1,9 +1,10 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, Team, TeamAdmin, DailyWork
-from schemas import (UserCreate, UserLogin, UserUpdate, UserTeamAssign)
+from schemas import UserCreate, UserLogin, UserUpdate, UserTeamAssign
 from services.password_service import hash_password, verify_password
 from services.auth_service import create_access_token
 from dependencies.auth import get_current_user
@@ -16,12 +17,12 @@ router = APIRouter(
     tags=["Users"]
 )
 
+
 @router.post("/register")
 def register_user(
-    user_data:UserCreate,
-    db:Session=Depends(get_db)
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
 ):
-
     # Check whether email already exists
     existing_user = db.query(User).filter(
         User.email == user_data.email
@@ -35,12 +36,12 @@ def register_user(
 
     # Create new user
     new_user = User(
-        name = user_data.name,
-        email = user_data.email,
-        password_hash = hash_password(user_data.password),
-        role = user_data.role,
-        team_id = user_data.team_id,
-        created_at = datetime.now()
+        name=user_data.name,
+        email=user_data.email,
+        password_hash=hash_password(user_data.password),
+        role=user_data.role,
+        team_id=user_data.team_id,
+        created_at=datetime.now()
     )
 
     # Save user
@@ -57,6 +58,7 @@ def register_user(
         "team_id": new_user.team_id
     }
 
+
 @router.post("/login")
 def login_user(
     user_data: UserLogin,
@@ -72,7 +74,7 @@ def login_user(
             detail="Invalid email or password"
         )
 
-    if not user.is_activate: # type: ignore
+    if not user.is_activate:  # type: ignore
         raise HTTPException(
             status_code=403,
             detail="User account is inactivate"
@@ -80,7 +82,7 @@ def login_user(
 
     password_is_correct = verify_password(
         user_data.password,
-        user.password_hash # type: ignore
+        user.password_hash  # type: ignore
     )
 
     if not password_is_correct:
@@ -90,9 +92,9 @@ def login_user(
         )
 
     access_token = create_access_token(
-        user_id=user.id, # type: ignore
-        email=user.email, # type: ignore
-        role=user.role # type: ignore
+        user_id=user.id,  # type: ignore
+        email=user.email,  # type: ignore
+        role=user.role  # type: ignore
     )
 
     return {
@@ -108,6 +110,7 @@ def login_user(
         }
     }
 
+
 @router.get("/me")
 def get_my_profile(
     current_user: User = Depends(get_current_user)
@@ -120,7 +123,8 @@ def get_my_profile(
         "team_id": current_user.team_id
     }
 
-# Get all users
+
+# Get all users - SUPER_ADMIN only
 @router.get("/")
 def get_all_users(
     current_user: User = Depends(
@@ -148,26 +152,21 @@ def get_all_users(
         "users": result
     }
 
+
+# Get team members, including inactive accounts
 @router.get("/team-members")
 def get_team_admin_members(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # --------------------------------------------------------
     # SUPER_ADMIN can see members from all teams
-    # --------------------------------------------------------
-
     if current_user.role == "SUPER_ADMIN":
 
         members = db.query(User).filter(
-            User.role == "MEMBER",
-            User.is_activate == True
+            User.role == "MEMBER"
         ).all()
 
-    # --------------------------------------------------------
-    # TEAM_ADMIN can see members only from assigned teams
-    # --------------------------------------------------------
-
+    # TEAM_ADMIN can see members from assigned teams only
     elif current_user.role == "TEAM_ADMIN":
 
         assignments = db.query(TeamAdmin).filter(
@@ -188,13 +187,8 @@ def get_team_admin_members(
 
         members = db.query(User).filter(
             User.team_id.in_(team_ids),
-            User.role == "MEMBER",
-            User.is_activate == True
+            User.role == "MEMBER"
         ).all()
-
-    # --------------------------------------------------------
-    # MEMBER cannot access
-    # --------------------------------------------------------
 
     else:
         raise HTTPException(
@@ -205,7 +199,6 @@ def get_team_admin_members(
     result = []
 
     for member in members:
-
         team = db.query(Team).filter(
             Team.id == member.team_id
         ).first()
@@ -226,26 +219,18 @@ def get_team_admin_members(
         "members": result
     }
 
+
 @router.get("/team-summary")
 def get_team_admin_team_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
-    # ========================================================
-    # SUPER_ADMIN
-    # Can see ALL teams
-    # ========================================================
-
+    # SUPER_ADMIN can see all teams
     if current_user.role == "SUPER_ADMIN":
 
         teams = db.query(Team).all()
 
-    # ========================================================
-    # TEAM_ADMIN
-    # Can see only assigned teams
-    # ========================================================
-
+    # TEAM_ADMIN can see assigned teams only
     elif current_user.role == "TEAM_ADMIN":
 
         assignments = db.query(TeamAdmin).filter(
@@ -268,10 +253,6 @@ def get_team_admin_team_summary(
             Team.id.in_(team_ids)
         ).all()
 
-    # ========================================================
-    # MEMBER
-    # ========================================================
-
     else:
         raise HTTPException(
             status_code=403,
@@ -281,8 +262,7 @@ def get_team_admin_team_summary(
     result = []
 
     for team in teams:
-
-        # Get active members of this team
+        # Get active members for the team summary
         members = db.query(User).filter(
             User.team_id == team.id,
             User.role == "MEMBER",
@@ -294,7 +274,6 @@ def get_team_admin_team_summary(
             for member in members
         ]
 
-        # Get daily work of these members
         daily_work = []
 
         if member_ids:
@@ -331,7 +310,8 @@ def get_team_admin_team_summary(
         "teams": result
     }
 
-# Get one user
+
+# Get one user - SUPER_ADMIN only
 @router.get("/{user_id}")
 def get_user(
     user_id: int,
@@ -360,7 +340,8 @@ def get_user(
         "created_at": user.created_at
     }
 
-# Update a user
+
+# Update a user - SUPER_ADMIN only
 @router.put("/{user_id}")
 def update_user(
     user_id: int,
@@ -392,10 +373,10 @@ def update_user(
                 detail="Email already registered"
             )
 
-        user.email = user_data.email # type: ignore
+        user.email = user_data.email  # type: ignore
 
     if user_data.name is not None:
-        user.name = user_data.name # type: ignore
+        user.name = user_data.name  # type: ignore
 
     if user_data.role is not None:
         allowed_roles = [
@@ -410,7 +391,7 @@ def update_user(
                 detail="Invalid role"
             )
 
-        user.role = user_data.role # type: ignore
+        user.role = user_data.role  # type: ignore
 
     if user_data.team_id is not None:
         team = db.query(Team).filter(
@@ -423,10 +404,10 @@ def update_user(
                 detail="Team not found"
             )
 
-        user.team_id = user_data.team_id # type: ignore
+        user.team_id = user_data.team_id  # type: ignore
 
     if user_data.is_activate is not None:
-        user.is_activate = user_data.is_activate # type: ignore
+        user.is_activate = user_data.is_activate  # type: ignore
 
     db.commit()
     db.refresh(user)
@@ -441,14 +422,13 @@ def update_user(
         "is_activate": user.is_activate
     }
 
+
 # Activate / deactivate user
 @router.patch("/{user_id}/activate")
 def activate_deactivate_user(
     user_id: int,
     is_activate: bool,
-    current_user: User = Depends(
-        require_role("SUPER_ADMIN")
-    ),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
@@ -461,7 +441,46 @@ def activate_deactivate_user(
             detail="User not found"
         )
 
-    user.is_activate = is_activate # type: ignore
+    # SUPER_ADMIN can manage MEMBER and TEAM_ADMIN accounts
+    if current_user.role == "SUPER_ADMIN":
+
+        if user.role not in ["MEMBER", "TEAM_ADMIN"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Super Admin can only change Member or Team Admin status"
+            )
+
+    # TEAM_ADMIN can manage members in assigned teams only
+    elif current_user.role == "TEAM_ADMIN":
+
+        if user.role != "MEMBER":
+            raise HTTPException(
+                status_code=403,
+                detail="Team Admin can only activate or deactivate team members"
+            )
+
+        assignments = db.query(TeamAdmin).filter(
+            TeamAdmin.user_id == current_user.id
+        ).all()
+
+        assigned_team_ids = [
+            assignment.team_id
+            for assignment in assignments
+        ]
+
+        if user.team_id not in assigned_team_ids:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only manage members in your assigned teams"
+            )
+
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to change user status"
+        )
+
+    user.is_activate = is_activate  # type: ignore
 
     db.commit()
     db.refresh(user)
@@ -472,7 +491,8 @@ def activate_deactivate_user(
         "is_activate": user.is_activate
     }
 
-# Assign Team API
+
+# Assign Team API - SUPER_ADMIN only
 @router.put("/{user_id}/team")
 def assign_team_to_user(
     user_id: int,
@@ -502,7 +522,7 @@ def assign_team_to_user(
             detail="Team not found"
         )
 
-    if not team.is_activate: # type: ignore
+    if not team.is_activate:  # type: ignore
         raise HTTPException(
             status_code=400,
             detail="Cannot assign user to an inactive team"

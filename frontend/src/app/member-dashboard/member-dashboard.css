@@ -162,7 +162,7 @@
 .submit-button:disabled {
   background: #999;
   cursor: not-allowed;
-  opacity: .7;
+  opacity: 0.7;
 }
 
 .error-message,
@@ -358,7 +358,7 @@
   border: 3px solid #e2e8f0;
   border-top-color: #2563eb;
   border-radius: 50%;
-  animation: history-spin .8s linear infinite;
+  animation: history-spin 0.8s linear infinite;
 }
 
 .history-alert {
@@ -370,7 +370,9 @@
 }
 
 @keyframes history-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Responsive */
@@ -503,7 +505,7 @@
 
 .history-clear-button:disabled {
   cursor: not-allowed;
-  opacity: .5;
+  opacity: 0.5;
 }
 
 /* Horizontal table scrolling */
@@ -592,4 +594,204 @@
 
 .history-scroll-container::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+.status-pending {
+  color: #9a6700;
+  font-weight: 600;
+}
+
+.status-approved {
+  color: #16803c;
+  font-weight: 600;
+}
+
+.status-rejected {
+  color: #c62828;
+  font-weight: 600;
+}
+
+/* Historical Edit Requests - matching Work History UI */
+.request-history-section {
+  min-width: 0;
+}
+
+.request-history-section .history-header h2 {
+  margin-bottom: 8px;
+  color: #172b4d;
+  font-size: 25px;
+}
+
+.request-history-section .history-header p {
+  margin: 0;
+  color: #68778b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.request-scroll-container {
+  max-height: 350px;
+}
+
+.request-table {
+  min-width: 1050px;
+}
+
+.request-table th:nth-child(1) {
+  width: 125px;
+}
+
+.request-table th:nth-child(2) {
+  width: 230px;
+}
+
+.request-table th:nth-child(3) {
+  width: 130px;
+}
+
+.request-table th:nth-child(4) {
+  width: 230px;
+}
+
+.request-table th:nth-child(5),
+.request-table th:nth-child(6) {
+  width: 175px;
+}
+
+.request-status {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.request-status.status-pending {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.request-status.status-approved {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.request-status.status-rejected {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.request-table td {
+  vertical-align: top;
+}
+
+.request-table .history-time {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .request-history-section .history-header h2 {
+    font-size: 22px;
+  }
+
+  .request-table {
+    min-width: 1050px;
+  }
+}
+
+
+/* ==========================================
+   Pagination - Member Dashboard
+   ========================================== */
+
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.pagination-info {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondary-btn {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.secondary-btn:hover:not(:disabled) {
+  border-color: #93b4f8;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.secondary-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.secondary-btn:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Responsive pagination */
+@media (max-width: 600px) {
+  .pagination-container {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px;
+  }
+
+  .pagination-info {
+    text-align: center;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .pagination-controls .secondary-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+  }
 }

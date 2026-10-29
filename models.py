@@ -2,6 +2,7 @@ from sqlalchemy import (Column, Integer, String, Boolean, Date, Time, DateTime, 
 from sqlalchemy.orm import relationship
 
 from database import Base
+from datetime import datetime
 
 # ==========================================
 # TEAM MODEL
@@ -40,7 +41,8 @@ class Team(Base):
 
     created_at = Column(
         DateTime,
-        nullable=True
+        nullable=False,
+        default=datetime.now
     )
 
 

@@ -7,6 +7,8 @@ from models import Team, User
 from schemas import TeamCreate, TeamUpdate
 from dependencies.roles import require_role
 
+from datetime import datetime
+
 router = APIRouter(
     prefix="/teams",
     tags=["Teams"]
@@ -40,7 +42,8 @@ def create_team(
         team_name=team_data.team_name,
         academic_year=team_data.academic_year,
         description=team_data.description,
-        is_activate=True
+        is_activate=True,
+        created_at=datetime.now()
     )
 
     db.add(new_team)
@@ -157,11 +160,31 @@ def update_team(
     if team_data.description is not None:
         team.description = team_data.description
 
+    
     if team_data.is_activate is not None:
         team.is_activate = team_data.is_activate
 
+    # Update team members and team admin when team status changes
+    db.query(User).filter(
+        User.team_id == team.id,
+        User.role.in_(["MEMBER", "TEAM_ADMIN"])
+    ).update(
+        {User.is_activate: team_data.is_activate},
+        synchronize_session=False
+    )
+
+    # If a team is deactivated, deactivate all users assigned to it.
+    if team_data.is_activate is False:
+        db.query(User).filter(
+            User.team_id == team.id
+        ).update(
+            {User.is_activate: False},
+            synchronize_session=False
+        )
+
     db.commit()
     db.refresh(team)
+
 
     return {
         "message": "Team updated successfully",
