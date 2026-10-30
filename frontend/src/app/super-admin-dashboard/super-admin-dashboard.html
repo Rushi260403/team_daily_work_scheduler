@@ -224,12 +224,7 @@
         <p>View, search, filter, and change team assignments.</p>
       </div>
 
-      <button
-        type="button"
-        class="refresh-btn"
-        (click)="loadUsers()"
-        [disabled]="usersLoading"
-      >
+      <button type="button" class="refresh-btn" (click)="loadUsers()" [disabled]="usersLoading">
         {{ usersLoading ? 'Loading...' : '↻ Refresh Users' }}
       </button>
     </div>
@@ -258,13 +253,15 @@
           id="userSearch"
           type="text"
           [(ngModel)]="userSearch"
+          (ngModelChange)="usersPage = 1"
           placeholder="Search by name or email..."
         />
       </div>
 
       <div class="filter-field">
         <label for="userRoleFilter">Filter by Role</label>
-        <select id="userRoleFilter" [(ngModel)]="selectedUserRole">
+        <select id="userRoleFilter" [(ngModel)]="selectedUserRole"
+        (ngModelChange)="usersPage = 1">
           <option value="">All Roles</option>
           @for (role of availableUserRoles; track role) {
             <option [value]="role">{{ role.replace('_', ' ') }}</option>
@@ -274,7 +271,8 @@
 
       <div class="filter-field">
         <label for="userTeamFilter">Filter by Team</label>
-        <select id="userTeamFilter" [(ngModel)]="selectedUserTeam">
+        <select id="userTeamFilter" [(ngModel)]="selectedUserTeam"
+        (ngModelChange)="usersPage = 1">
           <option value="">All Teams</option>
           @for (teamId of availableUserTeams; track teamId) {
             <option [value]="teamId">{{ getTeamName(teamId) }}</option>
@@ -284,7 +282,8 @@
 
       <div class="filter-field">
         <label for="userStatusFilter">Filter by Status</label>
-        <select id="userStatusFilter" [(ngModel)]="selectedUserStatus">
+        <select id="userStatusFilter" [(ngModel)]="selectedUserStatus"
+        (ngModelChange)="usersPage = 1">
           <option value="">All Statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>

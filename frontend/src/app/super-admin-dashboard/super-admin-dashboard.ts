@@ -541,6 +541,8 @@ export class SuperAdminDashboard implements OnInit {
     this.selectedUserRole = '';
     this.selectedUserTeam = '';
     this.selectedUserStatus = '';
+    // Return to the first page after clearing filters.
+    this.usersPage = 1;
   }
 
   // Step 2.2: Save a user's new team.
